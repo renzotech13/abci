@@ -1,0 +1,6 @@
+# Imágenes exportadas de WordPress (754 MB) - se sirven desde abciregistro.com via URL
+src/app/images/
+
+# Scripts de migración y datos PII
+scripts/wp-export/
+scripts/abci-export/

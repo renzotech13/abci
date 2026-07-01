@@ -9,18 +9,17 @@ export function generateId(prefix = ""): string {
 }
 
 export function generateCertificateId(): string {
-  const segments = [
-    "BPX",
-    Math.floor(Math.random() * 9000 + 1000).toString(),
-    Math.random().toString(36).slice(2, 7).toUpperCase(),
-    Math.floor(Math.random() * 90 + 10).toString(),
-  ];
-  return segments.join("-");
+  const num = Math.floor(Math.random() * 90000 + 10000);
+  return num.toString();
+}
+
+export function generateAffixId(): string {
+  return `AFX-${Math.floor(Math.random() * 9000 + 1000)}`;
 }
 
 export function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString("es-PE", {
       year: "numeric", month: "long", day: "numeric",
     });
   } catch {
@@ -30,7 +29,7 @@ export function formatDate(iso: string): string {
 
 export function formatShortDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString("es-PE", {
       year: "numeric", month: "short", day: "numeric",
     });
   } catch {
@@ -47,14 +46,21 @@ export function calculateAge(dob: string): string {
     years -= 1;
     months += 12;
   }
-  if (years <= 0) return `${months} months`;
-  return `${years}y ${months}m`;
+  if (years <= 0) return `${months} meses`;
+  return `${years}a ${months}m`;
 }
 
 export function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return s.toLowerCase()
+    .replace(/[áàäâ]/g, "a")
+    .replace(/[éèëê]/g, "e")
+    .replace(/[íìïî]/g, "i")
+    .replace(/[óòöô]/g, "o")
+    .replace(/[úùüû]/g, "u")
+    .replace(/ñ/g, "n")
+    .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 export function currency(amount: number, code = "USD"): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(amount);
+  return new Intl.NumberFormat("es-PE", { style: "currency", currency: code }).format(amount);
 }

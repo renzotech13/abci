@@ -1,70 +1,81 @@
-# BullyPedex Clone
+# ABCI World Wide — Plataforma de Registro Canino
 
-A modern, full-featured replica of [bullypedex.com](https://bullypedex.com) — the global pedigree database and certification registry for the bully community — built with **Next.js 16 + TypeScript + Tailwind CSS v4**.
+Plataforma completa de registro internacional canino construida con **Next.js 16 + TypeScript + Tailwind CSS v4**. Toda la interfaz está en español y adaptada al mercado latinoamericano.
 
-## What's included (functional clone)
+## Funcionalidades incluidas
 
-### Core registry features (replicated from bullypedex.com)
-- Landing page with hero, stats, features and testimonials
-- User registration & login (localStorage-based auth)
-- Kennel profile / dashboard
-- **Dog registration** (3-step wizard) → instant BPKC-style certificate
-- **Bulk Litter Registration** — register an entire litter at once
-- **Ownership Transfers** — email-based transfer flow with status tracking
-- **Certificate Verification** — public, no-account-needed cert lookup by ID
-- Standalone **public certificate page** with QR code and print mode
-- **Pedigree Search** — full-text search across all registered dogs
-- **Breeder Directory** with country filter + individual kennel profile pages
-- **Blog** with 6 articles (including the "How-to Guide on Bully Pedigrees")
-- **Code of Conduct** page
-- **Membership Plans** (Free / Pro / Elite) with FAQs
+### Registro y certificación
+- Página principal con hero, estadísticas y módulo de verificación
+- Registro y login de criadores (auth con localStorage)
+- Panel de criadero con resumen y métricas
+- **Registro de ejemplar** (asistente de 3 pasos) → certificado ABCI instantáneo
+- **Registro masivo de camada** — inscribe toda una camada de una vez
+- **Traspasos de propiedad** con flujo por correo y auditoría
+- **Verificación de certificados** pública sin necesidad de cuenta
+- Vista pública del **certificado** con código QR e impresión
+- **Búsqueda de ejemplares** por nombre, criadero, padre, madre, color
+- **Directorio de criaderos** filtrable por país con perfil individual
+- **Afijos** — registro y directorio público de afijos oficiales
+- **Blog** con 6 artículos sobre genética, COI, traspasos, etc.
+- **Código de conducta** ABCI
+- **Planes de membresía** Gratuito / Pro / Elite con preguntas frecuentes
 
-### Added-value features (not in original)
-- AI Breed Analyzer — upload a photo, get variant prediction, color genetics and weight estimate
-- Verified Marketplace — puppies, adults, stud service and equipment
-- Events Calendar — shows, expos, meetups with one-click registration
-- Health Vault — track vaccinations, OFA tests, weight, vet history
-- Interactive 4-generation pedigree tree with COI calculator
-- Dark/light theme toggle
-- Printable certificates with watermark
-- Help Center with searchable guides
-- Contact form with topic routing
+### Valor agregado (no estaba en el original)
+- Análisis IA de raza — sube una foto, predice variante, genética y peso adulto
+- Mercado verificado — cachorros, adultos, servicio de monta y equipo
+- Calendario de eventos — exhibiciones, expos, encuentros en LATAM
+- Bóveda de salud — vacunas, radiografías OFA, tests genéticos
+- Árbol de pedigree de 4 generaciones con calculadora COI
+- Modo oscuro/claro
+- Certificados imprimibles con marca de agua
+- Centro de ayuda buscable
+- Formulario de contacto con enrutamiento por tema
 
-## Demo account
+## Cuenta demo
 
-To skip signup, click "Try with demo account" on the login page, or use:
-- Email: `demo@bullypedex.app`
-- Password: `demo1234`
+Para saltar el registro, haz clic en "Probar con cuenta demo" en la página de inicio de sesión, o usa:
+- Correo: `demo@abciregistro.app`
+- Contraseña: `demo1234`
 
-The demo account has 5 pre-registered dogs, health records, an active marketplace listing and an elite membership.
+La cuenta demo trae 6 ejemplares pre-registrados (FIGHTING BULL MILI, KHABIT, CARACHAMA, etc.), registros de salud, anuncios activos y membresía Elite.
 
-## Sample certificate IDs to verify
+## Certificados de ejemplo para verificar
 
-- `BPX-2025-DIESEL-01`
-- `BPX-2025-NOVA-02`
-- `BPX-1024-ZEUS-19`
-- `BPX-2024-ROCKY-77`
+- `29601` — FIGHTING BULL MILI
+- `29602` — FIGHTING BULL THOR
+- `28401` — FIGHTING BULL KHABIT
+- `28950` — FIGHTING BULL CARACHAMA
+- `27889` — BULLYCAMP MEDUZA
+- `26551` — BULLYCAMP AZUMI
 
-## Tech stack
+## Afijos de ejemplo
+
+- `FIGHTING BULL` — Anthony Huamán, Perú
+- `BULLYCAMP` — Rosa Castillo, México
+- `TONNARD BULLIES` — Carlos Tonnard, Perú
+- `BULLSCAPE` — Diego Romero, Argentina
+- `ARIZONA BULLS` — Pedro Salazar, Chile
+
+## Stack técnico
 
 - Next.js 16 (App Router, Turbopack)
-- TypeScript strict mode
-- Tailwind CSS v4 with custom design tokens
-- localStorage for the prototype data layer (no backend needed — instantly deployable)
+- TypeScript en modo estricto
+- Tailwind CSS v4 con tokens de diseño personalizados
+- localStorage como capa de datos (sin backend — despliegue instantáneo)
 
-## Run locally
+## Ejecutar localmente
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Abre http://localhost:3000.
 
-## Deploy to Vercel
+## Desplegar en Vercel
 
 ```bash
 npx vercel --prod
 ```
 
-Or import the repo directly from the [Vercel dashboard](https://vercel.com/new).
+O importa el repo directamente desde el [panel de Vercel](https://vercel.com/new).

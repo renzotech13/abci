@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# datos exportados del registro (contienen PII: DNI, celular de propietarios)
+/scripts/wp-export/
+/scripts/abci-export/
+
+# imágenes exportadas de WordPress (754 MB — se sirven desde abciregistro.com vía URL directa)
+/src/app/images/

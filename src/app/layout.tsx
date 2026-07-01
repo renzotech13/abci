@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BullyPedex — The Global Bully Registry & Pedigree Database",
+  title: "ABCI World Wide — Registro Internacional Canino",
   description:
-    "Register your bully, verify pedigrees, and connect with the world's largest bully community. BPKC certified papers, AI breed analyzer, marketplace and more.",
+    "El registro canino más confiable de Latinoamérica. Documenta la genealogía de tu ejemplar, verifica pedigrees con QR, registra criaderos y afijos en línea.",
 };
 
 export default function RootLayout({
@@ -27,21 +26,19 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      lang="es"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try { var t = localStorage.getItem('bpx:theme'); if (t === 'dark') document.documentElement.classList.add('dark'); } catch(e){}`,
+            __html: `try { var t = localStorage.getItem('bpx:theme') || 'dark'; if (t === 'light') document.documentElement.classList.remove('dark'); else document.documentElement.classList.add('dark'); } catch(e){}`,
           }}
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

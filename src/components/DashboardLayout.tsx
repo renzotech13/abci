@@ -6,16 +6,21 @@ import { useEffect, useState, ReactNode } from "react";
 import { getCurrentUser, seedData } from "@/lib/store";
 import type { User } from "@/lib/types";
 import { Badge } from "./ui";
+import {
+  Home, Dog as DogIcon, PlusCircle, Users2, Tag,
+  ArrowLeftRight, HeartPulse, ShoppingBag, Settings,
+} from "lucide-react";
 
 const items = [
-  { href: "/dashboard", label: "Overview", icon: "🏠" },
-  { href: "/dashboard/dogs", label: "My Dogs", icon: "🐶" },
-  { href: "/dashboard/dogs/add", label: "Register a Dog", icon: "➕" },
-  { href: "/dashboard/litter", label: "Litter Registration", icon: "👪" },
-  { href: "/dashboard/transfers", label: "Ownership Transfers", icon: "🔁" },
-  { href: "/dashboard/health", label: "Health Vault", icon: "❤️" },
-  { href: "/dashboard/listings", label: "My Listings", icon: "🛒" },
-  { href: "/dashboard/profile", label: "Profile & Kennel", icon: "⚙️" },
+  { href: "/panel", label: "Resumen", Icon: Home },
+  { href: "/panel/dogs", label: "Mis ejemplares", Icon: DogIcon },
+  { href: "/panel/dogs/add", label: "Registrar ejemplar", Icon: PlusCircle },
+  { href: "/panel/litter", label: "Registro de camada", Icon: Users2 },
+  { href: "/panel/affixes", label: "Mis afijos", Icon: Tag },
+  { href: "/panel/transfers", label: "Traspasos", Icon: ArrowLeftRight },
+  { href: "/panel/health", label: "Bóveda de salud", Icon: HeartPulse },
+  { href: "/panel/listings", label: "Mis anuncios", Icon: ShoppingBag },
+  { href: "/panel/profile", label: "Perfil y criadero", Icon: Settings },
 ];
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
@@ -28,7 +33,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     seedData();
     const u = getCurrentUser();
     if (!u) {
-      router.push("/login");
+      router.push("/iniciar-sesion");
       return;
     }
     setUser(u);
@@ -38,7 +43,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   if (loading || !user) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-20 text-center text-muted-foreground">
-        Loading…
+        Cargando…
       </div>
     );
   }
@@ -59,24 +64,24 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="mt-3 flex items-center justify-between text-xs">
               <Badge variant={user.membership === "free" ? "default" : "accent"}>
-                {user.membership === "free" ? "Free Plan" : user.membership === "pro" ? "Pro Member" : "Elite Member"}
+                {user.membership === "free" ? "Plan Gratuito" : user.membership === "pro" ? "Miembro Pro" : "Miembro Elite"}
               </Badge>
               {user.membership === "free" && (
-                <Link href="/membership" className="text-amber-600 font-medium">Upgrade</Link>
+                <Link href="/membresia" className="text-amber-500 font-medium">Mejorar</Link>
               )}
             </div>
           </div>
           <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
-            {items.map(it => {
-              const active = pathname === it.href;
+            {items.map(({ href, label, Icon }) => {
+              const active = pathname === href;
               return (
                 <Link
-                  key={it.href} href={it.href}
-                  className={`shrink-0 inline-flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition ${
-                    active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  key={href} href={href}
+                  className={`shrink-0 inline-flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition whitespace-nowrap ${
+                    active ? "bg-amber-500 text-black" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <span>{it.icon}</span> <span>{it.label}</span>
+                  <Icon className="w-4 h-4" /> <span>{label}</span>
                 </Link>
               );
             })}

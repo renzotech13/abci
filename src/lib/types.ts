@@ -4,12 +4,24 @@ export type User = {
   password: string;
   name: string;
   kennelName?: string;
+  affix?: string;
   country?: string;
   phone?: string;
   bio?: string;
   avatar?: string;
   membership: "free" | "pro" | "elite";
+  role?: "user" | "admin";
   createdAt: string;
+};
+
+export type AdminLog = {
+  id: string;
+  adminId: string;
+  adminName: string;
+  action: string;
+  target?: string;
+  details?: string;
+  timestamp: string;
 };
 
 export type Dog = {
@@ -32,10 +44,12 @@ export type Dog = {
   sireName?: string;
   damName?: string;
   kennelName?: string;
+  breederName?: string;
   notes?: string;
   photo?: string;
   status: "active" | "deceased" | "transferred";
   titles?: string[];
+  location?: string;
 };
 
 export type HealthRecord = {
@@ -68,6 +82,19 @@ export type Transfer = {
   requestedAt: string;
   completedAt?: string;
   notes?: string;
+};
+
+export type Affix = {
+  id: string;
+  affixId: string;
+  name: string;
+  ownerId: string;
+  ownerName: string;
+  country: string;
+  createdAt: string;
+  status: "active" | "pending";
+  description?: string;
+  specialty?: string;
 };
 
 export type BlogPost = {

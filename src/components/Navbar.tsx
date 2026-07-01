@@ -7,14 +7,16 @@ import { ThemeToggle } from "./ThemeToggle";
 import { getCurrentUser, signOut, seedData } from "@/lib/store";
 import type { User } from "@/lib/types";
 import { usePathname, useRouter } from "next/navigation";
+import { QrCode, Menu, X, LayoutDashboard, ShieldCheck } from "lucide-react";
 
 const nav = [
-  { href: "/search", label: "Pedigree Search" },
-  { href: "/breeders", label: "Breeders" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/events", label: "Events" },
+  { href: "/ejemplares", label: "Ejemplares" },
+  { href: "/criaderos", label: "Criaderos" },
+  { href: "/afijos", label: "Afijos" },
+  { href: "/mercado", label: "Mercado" },
+  { href: "/eventos", label: "Eventos" },
   { href: "/blog", label: "Blog" },
-  { href: "/membership", label: "Membership" },
+  { href: "/membresia", label: "Membresía" },
 ];
 
 export function Navbar() {
@@ -43,13 +45,13 @@ export function Navbar() {
     <header className={`sticky top-0 z-50 transition-all ${scrolled ? "glass border-b border-border" : "bg-transparent"}`}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6">
             <Logo />
             <nav className="hidden lg:flex items-center gap-1">
               {nav.map(n => (
                 <Link
                   key={n.href} href={n.href}
-                  className={`px-3 py-2 rounded-lg text-sm transition ${pathname === n.href ? "text-foreground bg-muted" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                  className={`px-3 py-2 rounded-lg text-sm transition whitespace-nowrap ${pathname === n.href ? "text-amber-500 bg-muted" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                 >
                   {n.label}
                 </Link>
@@ -58,29 +60,35 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href="/verify" className="hidden md:inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-muted text-foreground text-sm hover:bg-amber-500/10 hover:text-amber-600 transition">
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 12 2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-9 9-5.5-1.5-9-4-9-9V5l9-3 9 3v7z"/></svg>
-              Verify
+            <Link
+              href="/verificar"
+              className="hidden md:inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-muted text-foreground text-sm hover:bg-amber-500/10 hover:text-amber-500 transition whitespace-nowrap"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Verificar QR</span>
             </Link>
             <ThemeToggle />
             {user ? (
               <div className="flex items-center gap-2">
-                <Link href="/dashboard" className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-full bg-foreground text-background text-sm hover:opacity-90">
-                  <span className="inline-flex w-6 h-6 rounded-full bg-amber-500 text-black text-xs items-center justify-center font-bold">
-                    {user.name.charAt(0)}
-                  </span>
-                  Dashboard
+                {user.role === "admin" && (
+                  <Link href="/admin" className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-zinc-900 border border-amber-500/40 text-amber-500 text-xs font-semibold hover:bg-amber-500 hover:text-black hover:border-amber-500 transition whitespace-nowrap">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Admin
+                  </Link>
+                )}
+                <Link href="/panel" className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-full bg-amber-500 text-black text-sm font-medium hover:bg-amber-400 whitespace-nowrap">
+                  <LayoutDashboard className="w-4 h-4" />
+                  Mi panel
                 </Link>
-                <button onClick={handleSignOut} className="hidden sm:inline-flex h-9 px-3 text-sm text-muted-foreground hover:text-foreground">Sign out</button>
+                <button onClick={handleSignOut} className="hidden sm:inline-flex h-9 px-3 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">Salir</button>
               </div>
             ) : (
               <>
-                <Link href="/login" className="hidden sm:inline-flex items-center h-9 px-3.5 rounded-full text-sm text-foreground hover:bg-muted">Sign in</Link>
-                <Link href="/register" className="inline-flex items-center h-9 px-4 rounded-full bg-foreground text-background text-sm font-medium hover:opacity-90">Join free</Link>
+                <Link href="/iniciar-sesion" className="hidden sm:inline-flex items-center h-9 px-3.5 rounded-full text-sm text-foreground hover:bg-muted whitespace-nowrap">Iniciar sesión</Link>
+                <Link href="/registrarse" className="inline-flex items-center h-9 px-4 rounded-full bg-amber-500 text-black text-sm font-medium hover:bg-amber-400 whitespace-nowrap">Registrarse</Link>
               </>
             )}
-            <button className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-full border border-border" onClick={() => setOpen(!open)} aria-label="Menu">
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">{open ? <path d="M18 6 6 18M6 6l12 12"/> : <path d="M3 12h18M3 6h18M3 18h18"/>}</svg>
+            <button className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-full border border-border" onClick={() => setOpen(!open)} aria-label="Menú">
+              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -91,11 +99,11 @@ export function Navbar() {
               {nav.map(n => (
                 <Link key={n.href} href={n.href} onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">{n.label}</Link>
               ))}
-              <Link href="/verify" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Verify Certificate</Link>
+              <Link href="/verificar" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Verificar QR</Link>
               {user ? (
-                <Link href="/dashboard" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Dashboard</Link>
+                <Link href="/panel" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Mi panel</Link>
               ) : (
-                <Link href="/login" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Sign in</Link>
+                <Link href="/iniciar-sesion" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg text-sm hover:bg-muted">Iniciar sesión</Link>
               )}
             </nav>
           </div>

@@ -3,92 +3,92 @@ import type { BlogPost } from "./types";
 export const BLOG_POSTS: BlogPost[] = [
   {
     id: "1",
-    slug: "how-to-guide-on-bully-pedigrees",
-    title: "How-to Guide on Bully Pedigrees: Everything a New Breeder Needs to Know",
-    excerpt: "Pedigrees are the foundation of every reputable breeding program. Here's how to read, build and protect yours.",
-    body: `Pedigrees are the family tree of a dog. They show the genetic lineage going back multiple generations, including parents, grandparents, and great-grandparents.
+    slug: "que-incluye-certificado-abci",
+    title: "Qué incluye un certificado ABCI y por qué importa más de lo que crees",
+    excerpt: "El pedigree es la columna vertebral de cualquier criadero serio. Aquí te explicamos cómo leerlo, construirlo y protegerlo.",
+    body: `Un pedigree es el árbol genealógico documentado de un ejemplar. Muestra la línea genética en múltiples generaciones, incluyendo padres, abuelos y bisabuelos.
 
-**Why pedigrees matter**
+**Por qué importan los pedigrees**
 
-A solid pedigree is more than just a piece of paper. It is proof that your dog comes from a documented bloodline, and it allows future owners to verify your dog's heritage independently. Without a pedigree, the breeding work of generations can be erased in a single sale.
+Un pedigree sólido es mucho más que un papel. Es la prueba de que tu ejemplar viene de una línea documentada y permite que cualquier futuro propietario pueda verificar su herencia de forma independiente. Sin un pedigree, el trabajo de varias generaciones puede borrarse con una sola venta sin papeles.
 
-**Reading a pedigree**
+**Cómo leer un pedigree**
 
-A standard 4-generation pedigree shows the sire (father) on top, dam (mother) on the bottom, and each ancestor pair branching out from there. Look for:
-- Champion titles (CH, GR CH)
-- Health clearances (OFA, DNA-tested)
-- Repeated names — a heavy line-bred ancestor can amplify both strengths and weaknesses
+Un pedigree estándar de 4 generaciones muestra al padre arriba, la madre abajo, y cada pareja de ancestros se ramifica desde ahí. Lo que debes mirar:
+- Títulos de campeonato (CH, GR CH)
+- Pruebas de salud (radiografías OFA, tests genéticos)
+- Nombres repetidos: un ancestro muy presente en la línea puede amplificar fortalezas y debilidades
 
-**Building your own**
+**Construir tu propio pedigree**
 
-When registering with BullyPedex, you can link existing certificates as sire and dam, and our system automatically computes the next-generation pedigree, plus the coefficient of inbreeding (COI). A healthy COI is under 6.25%.
+Al registrar en ABCI puedes vincular certificados ya existentes como padre y madre, y nuestro sistema calcula automáticamente el pedigree de la siguiente generación y el coeficiente de consanguinidad (COI). Un COI saludable está debajo del 6.25%.
 
-**Protecting your bloodlines**
+**Proteger tu línea**
 
-Always register before selling. A pedigree without a registered certificate ID is essentially unverifiable. Buyers in 2026 expect a QR-scannable cert before they put down a deposit.`,
-    author: "Marcus Whitlock",
+Siempre registra antes de vender. Un pedigree sin un número de certificado es prácticamente imposible de verificar. Los compradores en 2026 esperan un QR escaneable antes de pagar un depósito.`,
+    author: "Dr. Marcos Velarde",
     date: "2026-05-12",
-    tags: ["Pedigree", "Beginners", "Guide"],
+    tags: ["Pedigree", "Principiantes", "Guía"],
     cover: "📜",
     readTime: 6,
   },
   {
     id: "2",
-    slug: "abkc-vs-bpkc-which-registry",
-    title: "ABKC vs BPKC: Which Registry Should Your Kennel Use?",
-    excerpt: "We break down the differences between the two largest American Bully registries — and why most pro kennels now register with both.",
-    body: "The ABKC and BPKC have different standards, fees and recognition. This article walks through each one in detail with side-by-side comparisons...",
-    author: "Sasha Kim",
+    slug: "como-elegir-afijo-criadero",
+    title: "Cómo elegir el afijo perfecto para tu criadero",
+    excerpt: "El afijo es la firma de tu trabajo genético. Te contamos cómo escoger uno que represente tu visión y dure décadas.",
+    body: "El afijo es el nombre único e irrepetible de tu criadero, anclado a cada ejemplar que registres. Una vez registrado, queda protegido en toda Latinoamérica…",
+    author: "Anthony Huamán",
     date: "2026-04-28",
-    tags: ["ABKC", "BPKC", "Comparison"],
-    cover: "⚖️",
-    readTime: 8,
+    tags: ["Afijos", "Criadero", "Branding"],
+    cover: "🏷️",
+    readTime: 5,
   },
   {
     id: "3",
-    slug: "coi-coefficient-of-inbreeding",
-    title: "Understanding COI: The Coefficient of Inbreeding Every Breeder Must Know",
-    excerpt: "Why your line-breeding program may be quietly destroying genetic diversity — and how to fix it.",
-    body: "The Coefficient of Inbreeding (COI) measures how genetically related two parents are. The higher the COI, the higher the risk of recessive genetic disorders surfacing in the litter...",
-    author: "Dr. Amanda Reeves DVM",
+    slug: "coi-coeficiente-consanguinidad",
+    title: "Entender el COI: el coeficiente de consanguinidad que todo criador debe conocer",
+    excerpt: "Por qué tu programa de line-breeding podría estar destruyendo silenciosamente la diversidad genética, y cómo corregirlo.",
+    body: "El coeficiente de consanguinidad (COI) mide qué tan emparentados genéticamente están dos padres. A mayor COI, mayor riesgo de que aparezcan trastornos genéticos recesivos en la camada…",
+    author: "Dra. Amanda Reyes — Médico Veterinario",
     date: "2026-04-10",
-    tags: ["Genetics", "Health", "COI"],
+    tags: ["Genética", "Salud", "COI"],
     cover: "🧬",
     readTime: 10,
   },
   {
     id: "4",
-    slug: "tri-color-genetics-explained",
-    title: "Tri-Color Bully Genetics Explained (Simply)",
-    excerpt: "Lilac tri, chocolate tri, blue tri — where do these colors actually come from?",
-    body: "Tri-color American Bullies have exploded in popularity. The science behind them is rooted in two recessive alleles...",
-    author: "Marcus Whitlock",
+    slug: "genetica-tricolor-bully",
+    title: "Genética del Bully tricolor explicada (de forma simple)",
+    excerpt: "Lila tri, chocolate tri, azul tri — ¿de dónde vienen realmente estos colores?",
+    body: "Los American Bullies tricolores han explotado en popularidad. La ciencia detrás de ellos se basa en dos alelos recesivos…",
+    author: "Dr. Marcos Velarde",
     date: "2026-03-22",
-    tags: ["Genetics", "Color", "Tri"],
+    tags: ["Genética", "Color", "Tricolor"],
     cover: "🎨",
     readTime: 5,
   },
   {
     id: "5",
-    slug: "ownership-transfer-protect-yourself",
-    title: "Ownership Transfers: How to Protect Yourself as a Buyer or Seller",
-    excerpt: "Most disputes happen because of missing paperwork. Here's the bulletproof transfer workflow.",
-    body: "Whether you're selling a puppy or buying an adult, the ownership transfer is the most important step in protecting both parties...",
-    author: "Carlos Rocha",
+    slug: "traspaso-propiedad-protegete",
+    title: "Traspaso de propiedad: cómo protegerte como comprador o vendedor",
+    excerpt: "La mayoría de las disputas ocurren por papeleo faltante. Aquí está el flujo de traspaso a prueba de problemas.",
+    body: "Ya sea que estés vendiendo un cachorro o comprando un adulto, el traspaso de propiedad es el paso más importante para proteger a ambas partes…",
+    author: "Rosa Castillo",
     date: "2026-03-05",
-    tags: ["Ownership", "Transfer", "Legal"],
+    tags: ["Propiedad", "Traspaso", "Legal"],
     cover: "🔁",
     readTime: 7,
   },
   {
     id: "6",
-    slug: "preparing-your-bully-for-shows",
-    title: "Preparing Your Bully for Show: A 12-Week Plan",
-    excerpt: "From conditioning to ring etiquette — a week-by-week breakdown.",
-    body: "Show prep is part fitness, part presentation, part mental game. Here's the schedule that's worked for me across six championships...",
+    slug: "preparar-tu-bully-exposicion",
+    title: "Preparar a tu Bully para una exhibición: plan de 12 semanas",
+    excerpt: "Desde el acondicionamiento físico hasta la etiqueta en el ring — un desglose semana por semana.",
+    body: "Prepararse para una exhibición es parte fitness, parte presentación, parte juego mental. Aquí está el cronograma que me ha funcionado en seis campeonatos…",
     author: "Anna Lindqvist",
     date: "2026-02-18",
-    tags: ["Shows", "Training", "Guide"],
+    tags: ["Exposición", "Entrenamiento", "Guía"],
     cover: "🏆",
     readTime: 9,
   },

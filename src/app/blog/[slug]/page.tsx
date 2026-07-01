@@ -3,6 +3,16 @@ import { notFound } from "next/navigation";
 import { BLOG_POSTS } from "@/lib/blog";
 import { Badge, LinkButton } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
+import { ArrowLeft, ScrollText, Tag, Dna, Palette, ArrowLeftRight, Trophy, type LucideIcon } from "lucide-react";
+
+const COVER_ICON: Record<string, LucideIcon> = {
+  "📜": ScrollText,
+  "🏷️": Tag,
+  "🧬": Dna,
+  "🎨": Palette,
+  "🔁": ArrowLeftRight,
+  "🏆": Trophy,
+};
 
 export function generateStaticParams() {
   return BLOG_POSTS.map(p => ({ slug: p.slug }));
@@ -14,10 +24,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (!post) notFound();
 
   const related = BLOG_POSTS.filter(p => p.slug !== slug).slice(0, 3);
+  const CoverIcon = COVER_ICON[post.cover] || ScrollText;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground">← Back to blog</Link>
+      <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+        <ArrowLeft className="w-3.5 h-3.5" /> Volver al blog
+      </Link>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {post.tags.map(t => <Badge key={t} variant="accent">{t}</Badge>)}
@@ -28,12 +41,12 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-black flex items-center justify-center font-bold">{post.author.charAt(0)}</div>
         <div>
           <p className="font-medium text-foreground">{post.author}</p>
-          <p className="text-xs">{formatDate(post.date)} • {post.readTime} min read</p>
+          <p className="text-xs">{formatDate(post.date)} · {post.readTime} min de lectura</p>
         </div>
       </div>
 
-      <div className="mt-8 rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-rose-500/10 aspect-video flex items-center justify-center text-9xl">
-        {post.cover}
+      <div className="mt-8 rounded-3xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-zinc-900/30 aspect-video flex items-center justify-center">
+        <CoverIcon className="w-32 h-32 text-amber-500" strokeWidth={1.25} />
       </div>
 
       <div className="prose prose-lg max-w-none mt-10 leading-relaxed text-foreground/90 space-y-4">
@@ -53,21 +66,24 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       </div>
 
       <div className="mt-12 p-6 rounded-3xl border border-amber-500/30 bg-amber-500/5 text-center">
-        <h3 className="text-xl font-bold">Ready to register your bloodline?</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Free account. Instant digital certificate. BPKC™ recognized worldwide.</p>
-        <LinkButton href="/register" variant="accent" className="mt-4">Create kennel account</LinkButton>
+        <h3 className="text-xl font-bold">¿Listo para registrar tu línea?</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Cuenta gratuita. Certificado digital instantáneo. Reconocido en toda Latinoamérica.</p>
+        <LinkButton href="/registrarse" variant="accent" className="mt-4">Crear cuenta de criadero</LinkButton>
       </div>
 
       <div className="mt-12">
-        <h3 className="text-xl font-bold mb-5">Related reading</h3>
+        <h3 className="text-xl font-bold mb-5">Lecturas relacionadas</h3>
         <div className="grid sm:grid-cols-3 gap-4">
-          {related.map(r => (
-            <Link key={r.id} href={`/blog/${r.slug}`} className="block p-4 rounded-2xl border border-border hover:border-amber-500/40 transition">
-              <div className="text-3xl">{r.cover}</div>
-              <p className="font-semibold mt-2 text-sm leading-snug">{r.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{r.readTime} min</p>
-            </Link>
-          ))}
+          {related.map(r => {
+            const Icon = COVER_ICON[r.cover] || ScrollText;
+            return (
+              <Link key={r.id} href={`/blog/${r.slug}`} className="block p-4 rounded-2xl border border-border hover:border-amber-500/40 transition">
+                <Icon className="w-7 h-7 text-amber-500" strokeWidth={1.5} />
+                <p className="font-semibold mt-2 text-sm leading-snug">{r.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{r.readTime} min</p>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </article>

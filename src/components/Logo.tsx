@@ -5,7 +5,7 @@ export function Logo({ size = "default" }: { size?: "default" | "small" | "large
   const text = size === "small" ? "text-sm" : size === "large" ? "text-2xl" : "text-lg";
   const sub = size === "small" ? "text-[7px]" : size === "large" ? "text-[10px]" : "text-[8px]";
   return (
-    <Link href="/" className="inline-flex items-center gap-2.5 group">
+    <Link href="/" className="inline-flex items-center gap-2.5 group shrink-0">
       <span className="relative inline-flex items-center justify-center shrink-0" style={{ width: dim, height: dim }}>
         <svg viewBox="0 0 56 56" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -30,11 +30,11 @@ export function Logo({ size = "default" }: { size?: "default" | "small" | "large
           <circle cx="50" cy="28" r="2" fill="#e8b923" />
         </svg>
       </span>
-      <span className="flex flex-col leading-none">
-        <span className={`font-black tracking-tight ${text} text-foreground`}>
+      <span className="flex flex-col leading-none shrink-0 whitespace-nowrap">
+        <span className={`font-black tracking-tight ${text} text-foreground whitespace-nowrap`}>
           ABCI <span className="text-amber-500">World Wide</span>
         </span>
-        <span className={`${sub} uppercase tracking-[0.25em] text-muted-foreground mt-1`}>Registro Internacional Canino</span>
+        <span className={`${sub} uppercase tracking-[0.25em] text-muted-foreground mt-1 whitespace-nowrap`}>Registro Internacional Canino</span>
       </span>
     </Link>
   );

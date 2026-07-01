@@ -115,7 +115,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className={`fixed lg:sticky top-0 left-0 z-40 h-screen ${sidebarWidth} ${mobileOpen ? "w-72 translate-x-0" : "-translate-x-full lg:translate-x-0"} transition-all bg-zinc-950 dark:bg-black border-r border-border flex flex-col`}>
+        <aside className={`fixed lg:sticky top-0 left-0 z-40 h-screen ${sidebarWidth} ${mobileOpen ? "w-72 translate-x-0" : "-translate-x-full lg:translate-x-0"} transition-all duration-300 ease-out bg-zinc-950 dark:bg-black border-r border-border flex flex-col`}>
           <div className="h-16 px-5 flex items-center justify-between border-b border-border shrink-0">
             <Link href="/admin" className="flex items-center gap-2 min-w-0">
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shrink-0">
@@ -146,10 +146,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                       <Link
                         key={href} href={href}
                         onClick={() => setMobileOpen(false)}
-                        className={`group flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition ${
+                        className={`group flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 cursor-pointer ${
                           active
-                            ? "bg-amber-500 text-black font-semibold"
-                            : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                            ? "bg-amber-500 text-black font-semibold shadow-[0_2px_10px_rgba(232,185,35,0.3)]"
+                            : "text-zinc-300 hover:bg-zinc-800 hover:text-white hover:translate-x-0.5"
                         } ${collapsed ? "justify-center" : ""}`}
                         title={collapsed ? label : undefined}
                       >

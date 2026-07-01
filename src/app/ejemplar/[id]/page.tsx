@@ -70,7 +70,7 @@ export default function DogDetailPage({ params }: { params: Promise<{ id: string
           )}
           <div className="flex-1 min-w-0">
             <Badge variant="success" className="mb-3"><ShieldCheck className="w-3 h-3" /> Certificado ABCI verificado</Badge>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{dog.name}</h1>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">{dog.name}</h1>
             {dog.callName && <p className="text-lg text-muted-foreground mt-0.5">Llamado &quot;{dog.callName}&quot;</p>}
             <p className="font-mono text-sm text-muted-foreground mt-2">Nro. de registro {dog.certificateId}</p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -97,7 +97,7 @@ export default function DogDetailPage({ params }: { params: Promise<{ id: string
           ["siblings", "Hermanos"],
         ] as const).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ${tab === t ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors duration-200 whitespace-nowrap cursor-pointer ${tab === t ? "border-amber-500 text-amber-500" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {label}
           </button>
         ))}

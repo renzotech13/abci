@@ -72,7 +72,7 @@ function CertificateInner({ id }: { id: string }) {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">ABCI World Wide — Registro Internacional</p>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">Certificado de Pedigree</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-1">Certificado de Pedigree</h1>
             <p className="text-xs text-muted-foreground mt-1">All Breeders Cynologique International</p>
           </div>
           <div className="flex items-center gap-2">
@@ -92,10 +92,10 @@ function CertificateInner({ id }: { id: string }) {
             )}
             <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Este documento certifica que</p>
-            <h2 className="text-3xl sm:text-4xl font-bold mt-2 leading-tight">{dog.name}</h2>
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold mt-2 leading-tight">{dog.name}</h2>
             {dog.callName && <p className="text-sm text-muted-foreground mt-1">&quot;{dog.callName}&quot;</p>}
             <p className="text-sm mt-4">se encuentra registrado en ABCI World Wide como <span className="font-semibold">{dog.breed}{dog.variant ? ` (${dog.variant})` : ""}</span>, con el siguiente número oficial:</p>
-            <p className="font-mono font-bold text-3xl mt-3 tracking-wider text-amber-500">{dog.certificateId}</p>
+            <p className="font-mono font-bold text-3xl mt-3 tracking-wider text-amber-500 tabular-nums">{dog.certificateId}</p>
             </div>
           </div>
           <div className="flex flex-col items-center gap-2">

@@ -42,7 +42,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-20 text-center text-muted-foreground">
+      <div className="mx-auto max-w-7xl px-4 py-20 text-center text-muted-foreground animate-pulse">
         Cargando…
       </div>
     );
@@ -77,8 +77,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               return (
                 <Link
                   key={href} href={href}
-                  className={`shrink-0 inline-flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition whitespace-nowrap ${
-                    active ? "bg-amber-500 text-black" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className={`shrink-0 inline-flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                    active ? "bg-amber-500 text-black shadow-[0_2px_10px_rgba(232,185,35,0.3)]" : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5"
                   }`}
                 >
                   <Icon className="w-4 h-4" /> <span>{label}</span>

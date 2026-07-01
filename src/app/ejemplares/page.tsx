@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getDogs, seedData } from "@/lib/store";
 import type { Dog } from "@/lib/types";
-import { Card, Input, Badge, SectionHeading } from "@/components/ui";
+import { Card, Input, Select, Badge, SectionHeading } from "@/components/ui";
+import { Reveal } from "@/components/Reveal";
 import { DogAvatar } from "@/components/DogAvatar";
 import { calculateAge, formatShortDate } from "@/lib/utils";
 import { Search, ChevronRight } from "lucide-react";
@@ -37,29 +38,31 @@ export default function EjemplaresPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <SectionHeading eyebrow="Búsqueda de ejemplares" title="Explora más de 29,000 ejemplares verificados" description="Busca por nombre, criadero, padre, madre, color o número de registro ABCI." />
 
-      <Card className="mt-8">
-        <div className="grid md:grid-cols-[1fr_auto_auto] gap-3">
-          <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Prueba 'KHABIT', 'FIGHTING BULL' o 29601..." />
-          <select value={gender} onChange={e => setGender(e.target.value as "all" | "male" | "female")} className="h-11 px-3 rounded-xl border border-border bg-background text-sm">
-            <option value="all">Ambos sexos</option>
-            <option value="male">♂ Macho</option>
-            <option value="female">♀ Hembra</option>
-          </select>
-          <select value={breed} onChange={e => setBreed(e.target.value)} className="h-11 px-3 rounded-xl border border-border bg-background text-sm">
-            <option value="all">Todas las razas</option>
-            {breeds.map(b => <option key={b}>{b}</option>)}
-          </select>
-        </div>
-        <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-          <span>{filtered.length} ejemplares encontrados</span>
-          <span className="text-xs">Mostrando resultados del registro público</span>
-        </div>
-      </Card>
+      <Reveal>
+        <Card className="mt-8">
+          <div className="grid md:grid-cols-[1fr_auto_auto] gap-3">
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Prueba 'KHABIT', 'FIGHTING BULL' o 29601..." />
+            <Select value={gender} onChange={e => setGender(e.target.value as "all" | "male" | "female")}>
+              <option value="all">Ambos sexos</option>
+              <option value="male">♂ Macho</option>
+              <option value="female">♀ Hembra</option>
+            </Select>
+            <Select value={breed} onChange={e => setBreed(e.target.value)}>
+              <option value="all">Todas las razas</option>
+              {breeds.map(b => <option key={b}>{b}</option>)}
+            </Select>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+            <span className="tabular-nums">{filtered.length} ejemplares encontrados</span>
+            <span className="text-xs">Mostrando resultados del registro público</span>
+          </div>
+        </Card>
+      </Reveal>
 
       <div className="mt-6 space-y-3">
         {filtered.map(d => (
-          <Link key={d.id} href={`/ejemplar/${d.id}`} className="block">
-            <Card className="hover:border-amber-500/40 transition flex items-center gap-4">
+          <Link key={d.id} href={`/ejemplar/${d.id}`} className="block group">
+            <Card className="flex items-center gap-4 transition-all duration-200 hover:border-amber-500/40 hover:shadow-elevation-2 hover:-translate-y-0.5 cursor-pointer">
               <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -74,7 +77,7 @@ export default function EjemplaresPage() {
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">Padre: <span className="text-foreground">{d.sireName || "—"}</span> · Madre: <span className="text-foreground">{d.damName || "—"}</span></p>
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
             </Card>
           </Link>
         ))}

@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { getCurrentUser, getMyDogs, getHealthRecords, getMyTransfers } from "@/lib/store";
 import type { User, Dog } from "@/lib/types";
 import { LinkButton, Card, Badge, Empty } from "@/components/ui";
+import { Reveal } from "@/components/Reveal";
 import { DogAvatar } from "@/components/DogAvatar";
 import Link from "next/link";
 import { formatShortDate, calculateAge } from "@/lib/utils";
@@ -28,8 +29,8 @@ export default function DashboardOverview() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bienvenido de nuevo, {user?.name?.split(" ")[0]}</h1>
+      <div className="mb-6 animate-fade-in-up">
+        <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">Bienvenido de nuevo, {user?.name?.split(" ")[0]}</h1>
         <p className="text-sm text-muted-foreground mt-1">Esto es lo que está pasando en tu criadero hoy.</p>
       </div>
 
@@ -39,14 +40,16 @@ export default function DashboardOverview() {
           { label: "Certificados emitidos", value: dogs.length, sub: "verificados ABCI", Icon: FileText },
           { label: "Registros de salud", value: healthCount, sub: "de todos los ejemplares", Icon: HeartPulse },
           { label: "Traspasos", value: transferCount, sub: "iniciados", Icon: ArrowLeftRight },
-        ].map(s => (
-          <Card key={s.label} className="relative overflow-hidden">
-            <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-amber-500/10" />
-            <s.Icon className="w-6 h-6 text-amber-500 mb-2 relative" strokeWidth={1.75} />
-            <p className="text-3xl font-bold relative">{s.value}</p>
-            <p className="text-sm text-muted-foreground relative">{s.label}</p>
-            <p className="text-xs text-muted-foreground mt-1 relative">{s.sub}</p>
-          </Card>
+        ].map((s, i) => (
+          <Reveal key={s.label} delay={i * 60}>
+            <Card hoverable className="relative overflow-hidden">
+              <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-amber-500/10" />
+              <s.Icon className="w-6 h-6 text-amber-500 mb-2 relative" strokeWidth={1.75} />
+              <p className="text-3xl font-bold relative tabular-nums">{s.value}</p>
+              <p className="text-sm text-muted-foreground relative">{s.label}</p>
+              <p className="text-xs text-muted-foreground mt-1 relative">{s.sub}</p>
+            </Card>
+          </Reveal>
         ))}
       </div>
 
@@ -54,7 +57,7 @@ export default function DashboardOverview() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Ejemplares recientes</h2>
-            <Link href="/panel/dogs" className="text-sm text-amber-500 hover:underline inline-flex items-center gap-1">
+            <Link href="/panel/dogs" className="link-underline text-sm text-amber-500 inline-flex items-center gap-1">
               Ver todos <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -67,7 +70,7 @@ export default function DashboardOverview() {
           ) : (
             <div className="space-y-3">
               {dogs.slice(0, 5).map(d => (
-                <Link href={`/ejemplar/${d.id}`} key={d.id} className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-amber-500/50 transition">
+                <Link href={`/ejemplar/${d.id}`} key={d.id} className="group flex items-center gap-4 p-4 rounded-2xl border border-border bg-card transition-all duration-200 hover:border-amber-500/50 hover:shadow-elevation-2 hover:-translate-y-0.5 cursor-pointer">
                   <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
@@ -77,7 +80,7 @@ export default function DashboardOverview() {
                     <p className="text-xs text-muted-foreground font-mono">Nro. {d.certificateId}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{d.color} • {calculateAge(d.dob)} • Nac. {formatShortDate(d.dob)}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
                 </Link>
               ))}
             </div>

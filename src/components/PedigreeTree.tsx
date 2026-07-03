@@ -43,22 +43,38 @@ async function resolveGenerations(root: Dog) {
     for (const d of data || []) byName.set(norm(d.name), d);
   }
 
-  function resolve(dog: Dog | null, which: "sire" | "dam"): { dog: Dog | null; rawName: string } {
+  // Algunos registros heredados del sitio anterior tienen datos de origen
+  // erróneos donde un ejemplar figura como su propia madre/padre (o forman
+  // un ciclo indirecto). Sin este chequeo, esas líneas se "resuelven" en un
+  // bucle infinito que repite la misma tarjeta en cada generación. Se corta
+  // el ciclo tratando a ese ancestro como no registrado.
+  function resolve(dog: Dog | null, which: "sire" | "dam", ancestorIds: Set<string>): { dog: Dog | null; rawName: string } {
     if (!dog) return { dog: null, rawName: "" };
     const name = which === "sire" ? dog.sire_name : dog.dam_name;
-    const found = byName.get(norm(name)) || null;
+    let found = byName.get(norm(name)) || null;
+    if (found && ancestorIds.has(found.id)) found = null;
     return { dog: found, rawName: name || "" };
   }
 
+  const rootIds = new Set([root.id]);
+
   await fetchByNames([root.sire_name || "", root.dam_name || ""]);
-  const sire = resolve(root, "sire");
-  const dam = resolve(root, "dam");
+  const sire = resolve(root, "sire", rootIds);
+  const dam = resolve(root, "dam", rootIds);
+
+  const sireIds = new Set(sire.dog ? [...rootIds, sire.dog.id] : rootIds);
+  const damIds = new Set(dam.dog ? [...rootIds, dam.dog.id] : rootIds);
 
   await fetchByNames([sire.dog?.sire_name || "", sire.dog?.dam_name || "", dam.dog?.sire_name || "", dam.dog?.dam_name || ""]);
-  const sireSire = resolve(sire.dog, "sire");
-  const sireDam = resolve(sire.dog, "dam");
-  const damSire = resolve(dam.dog, "sire");
-  const damDam = resolve(dam.dog, "dam");
+  const sireSire = resolve(sire.dog, "sire", sireIds);
+  const sireDam = resolve(sire.dog, "dam", sireIds);
+  const damSire = resolve(dam.dog, "sire", damIds);
+  const damDam = resolve(dam.dog, "dam", damIds);
+
+  const sireSireIds = new Set(sireSire.dog ? [...sireIds, sireSire.dog.id] : sireIds);
+  const sireDamIds = new Set(sireDam.dog ? [...sireIds, sireDam.dog.id] : sireIds);
+  const damSireIds = new Set(damSire.dog ? [...damIds, damSire.dog.id] : damIds);
+  const damDamIds = new Set(damDam.dog ? [...damIds, damDam.dog.id] : damIds);
 
   await fetchByNames([
     sireSire.dog?.sire_name || "", sireSire.dog?.dam_name || "",
@@ -66,14 +82,14 @@ async function resolveGenerations(root: Dog) {
     damSire.dog?.sire_name || "", damSire.dog?.dam_name || "",
     damDam.dog?.sire_name || "", damDam.dog?.dam_name || "",
   ]);
-  const ggSireSireSire = resolve(sireSire.dog, "sire");
-  const ggSireSireDam = resolve(sireSire.dog, "dam");
-  const ggSireDamSire = resolve(sireDam.dog, "sire");
-  const ggSireDamDam = resolve(sireDam.dog, "dam");
-  const ggDamSireSire = resolve(damSire.dog, "sire");
-  const ggDamSireDam = resolve(damSire.dog, "dam");
-  const ggDamDamSire = resolve(damDam.dog, "sire");
-  const ggDamDamDam = resolve(damDam.dog, "dam");
+  const ggSireSireSire = resolve(sireSire.dog, "sire", sireSireIds);
+  const ggSireSireDam = resolve(sireSire.dog, "dam", sireSireIds);
+  const ggSireDamSire = resolve(sireDam.dog, "sire", sireDamIds);
+  const ggSireDamDam = resolve(sireDam.dog, "dam", sireDamIds);
+  const ggDamSireSire = resolve(damSire.dog, "sire", damSireIds);
+  const ggDamSireDam = resolve(damSire.dog, "dam", damSireIds);
+  const ggDamDamSire = resolve(damDam.dog, "sire", damDamIds);
+  const ggDamDamDam = resolve(damDam.dog, "dam", damDamIds);
 
   const gen1: Node[] = [
     { ...sire, label: "Padre", gender: "male", gen: 1 },

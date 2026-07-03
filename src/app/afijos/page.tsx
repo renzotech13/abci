@@ -1,48 +1,45 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAffixes, seedData } from "@/lib/store";
-import type { Affix } from "@/lib/types";
-import { Card, Input, Badge, SectionHeading } from "@/components/ui";
+import { createClient } from "@/lib/supabase/server";
+import { Card, Badge, SectionHeading } from "@/components/ui";
 import { Tag, ShieldCheck, Search } from "lucide-react";
+import { AfijosFilters } from "./AfijosFilters";
 
-export default function AfijosPage() {
-  const [affixes, setAffixes] = useState<Affix[]>([]);
-  const [query, setQuery] = useState("");
-  const [country, setCountry] = useState("all");
+function escapeForOrFilter(v: string) {
+  return v.replace(/\\/g, "\\\\").replace(/[%_,()]/g, c => `\\${c}`);
+}
 
-  useEffect(() => {
-    seedData();
-    setAffixes(getAffixes());
-  }, []);
+export default async function AfijosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; country?: string }>;
+}) {
+  const params = await searchParams;
+  const q = (params.q || "").trim();
+  const country = params.country || "all";
 
-  const countries = Array.from(new Set(affixes.map(a => a.country).filter(Boolean)));
+  const supabase = await createClient();
+  let query = supabase.from("affixes").select("*").order("name");
+  if (country !== "all") query = query.eq("country", country);
+  if (q) {
+    const esc = escapeForOrFilter(q);
+    query = query.or(`name.ilike.%${esc}%,owner_name.ilike.%${esc}%,specialty.ilike.%${esc}%`);
+  }
+  const { data: affixes } = await query;
 
-  const filtered = affixes.filter(a => {
-    if (country !== "all" && a.country !== country) return false;
-    if (query && !`${a.name} ${a.ownerName} ${a.country} ${a.specialty}`.toLowerCase().includes(query.toLowerCase())) return false;
-    return true;
-  });
+  const { data: countryRows } = await supabase.from("affixes").select("country").not("country", "is", null);
+  const countries = Array.from(new Set((countryRows || []).map(r => r.country).filter(Boolean) as string[])).sort();
+
+  const list = affixes || [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <SectionHeading eyebrow="Afijos registrados" title="Directorio oficial de afijos ABCI" description="Cada criadero registra un afijo único e irrepetible que antepone al nombre de sus ejemplares. Aquí están todos los afijos oficiales." />
 
-      <Card className="mt-8">
-        <div className="grid md:grid-cols-[1fr_auto] gap-3">
-          <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nombre del afijo, dueño o especialidad..." />
-          <select value={country} onChange={e => setCountry(e.target.value)} className="h-11 px-3 rounded-xl border border-border bg-background text-sm">
-            <option value="all">Todos los países</option>
-            {countries.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <p className="text-sm text-muted-foreground mt-3">{filtered.length} afijos registrados</p>
-      </Card>
+      <AfijosFilters initialQuery={q} initialCountry={country} countries={countries} resultCount={list.length} />
 
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(a => (
-          <Link key={a.id} href={`/afijos/${a.id}`}>
+        {list.map(a => (
+          <Link key={a.id} href={`/afijos/${a.affix_code}`}>
             <Card className="hover:border-amber-500/40 transition h-full">
               <div className="flex items-start gap-3">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-black flex items-center justify-center">
@@ -50,13 +47,13 @@ export default function AfijosPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-mono font-bold text-base leading-tight">{a.name}</h3>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{a.affixId}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{a.affix_code}</p>
                   <Badge variant="success" className="mt-2"><ShieldCheck className="w-3 h-3" /> Activo</Badge>
                 </div>
               </div>
               {a.specialty && <p className="text-sm text-muted-foreground mt-4 line-clamp-2">{a.specialty}</p>}
               <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                <span>{a.ownerName}</span>
+                <span>{a.owner_name}</span>
                 <span>{a.country}</span>
               </div>
             </Card>
@@ -64,7 +61,7 @@ export default function AfijosPage() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {list.length === 0 && (
         <Card className="text-center py-12 mt-6">
           <Search className="w-9 h-9 mx-auto mb-3 text-muted-foreground" strokeWidth={1.5} />
           <p className="font-semibold">No se encontraron afijos</p>

@@ -1,27 +1,18 @@
-"use client";
-
-import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { getAffixes, getDogs, seedData } from "@/lib/store";
-import type { Affix, Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/server";
 import { Card, Badge, SectionHeading, LinkButton } from "@/components/ui";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatShortDate, formatDate } from "@/lib/utils";
 import { Tag, ShieldCheck } from "lucide-react";
 
-export default function AfijoDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [affix, setAffix] = useState<Affix | null>(null);
-  const [dogs, setDogs] = useState<Dog[]>([]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  useEffect(() => {
-    seedData();
-    const a = getAffixes().find(x => x.id === id || x.affixId === id) || null;
-    setAffix(a);
-    if (a) {
-      setDogs(getDogs().filter(d => d.kennelName?.toUpperCase().includes(a.name) || d.name.startsWith(a.name)));
-    }
-  }, [id]);
+export default async function AfijoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const filter = UUID_RE.test(id) ? `id.eq.${id},affix_code.eq.${id}` : `affix_code.eq.${id}`;
+  const { data: affix } = await supabase.from("affixes").select("*").or(filter).maybeSingle();
 
   if (!affix) {
     return (
@@ -33,6 +24,15 @@ export default function AfijoDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  const esc = affix.name.replace(/\\/g, "\\\\").replace(/[%_,()]/g, c => `\\${c}`);
+  const { data: dogs } = await supabase
+    .from("dogs")
+    .select("*")
+    .or(`kennel_name.ilike.%${esc}%,name.ilike.${esc}%`)
+    .order("registration_date", { ascending: false })
+    .limit(60);
+  const list = dogs || [];
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="rounded-3xl border border-border bg-card p-8">
@@ -43,13 +43,13 @@ export default function AfijoDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex-1">
             <Badge variant="success" className="mb-3"><ShieldCheck className="w-3 h-3" /> Afijo oficial verificado</Badge>
             <h1 className="text-3xl font-mono font-black tracking-tight">{affix.name}</h1>
-            <p className="font-mono text-sm text-muted-foreground mt-1">{affix.affixId}</p>
+            <p className="font-mono text-sm text-muted-foreground mt-1">{affix.affix_code}</p>
             {affix.specialty && <p className="text-base mt-3"><strong>Especialidad:</strong> {affix.specialty}</p>}
             {affix.description && <p className="mt-3 text-sm text-muted-foreground max-w-2xl">{affix.description}</p>}
             <div className="mt-5 grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Propietario</p>
-                <p className="font-medium mt-0.5">{affix.ownerName}</p>
+                <p className="font-medium mt-0.5">{affix.owner_name}</p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">País</p>
@@ -57,33 +57,33 @@ export default function AfijoDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Registrado</p>
-                <p className="font-medium mt-0.5">{formatDate(affix.createdAt)}</p>
+                <p className="font-medium mt-0.5">{formatDate(affix.created_at)}</p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Ejemplares en ABCI</p>
-                <p className="font-medium mt-0.5">{dogs.length}</p>
+                <p className="font-medium mt-0.5">{list.length}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {dogs.length > 0 && (
+      {list.length > 0 && (
         <div className="mt-10">
-          <SectionHeading title="Ejemplares con este afijo" description={`${dogs.length} ejemplares registrados`} />
+          <SectionHeading title="Ejemplares con este afijo" description={`${list.length} ejemplares registrados`} />
           <div className="mt-6 grid sm:grid-cols-2 gap-4">
-            {dogs.map(d => (
+            {list.map(d => (
               <Link key={d.id} href={`/ejemplar/${d.id}`}>
                 <Card className="hover:border-amber-500/40 transition flex items-start gap-3">
-                  <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo} />
+                  <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo_url ?? undefined} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{d.name}</p>
-                    <p className="text-xs text-muted-foreground font-mono">Nro. {d.certificateId}</p>
+                    <p className="text-xs text-muted-foreground font-mono">Nro. {d.certificate_id}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <Badge>{d.gender === "male" ? "♂" : "♀"}</Badge>
-                      <Badge variant="accent">{d.color}</Badge>
+                      {d.color && <Badge variant="accent">{d.color}</Badge>}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">Nac. {formatShortDate(d.dob)}</p>
+                    <p className="text-xs text-muted-foreground mt-2">{d.dob ? `Nac. ${formatShortDate(d.dob)}` : "Fecha no registrada"}</p>
                   </div>
                 </Card>
               </Link>

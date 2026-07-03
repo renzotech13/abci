@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDog, seedData } from "@/lib/store";
+import { findCertificate } from "./actions";
 import { Card, Button, Input, Badge } from "@/components/ui";
 import { Lock, Zap, Globe, QrCode } from "lucide-react";
 
@@ -10,16 +10,18 @@ export default function VerifyPage() {
   const router = useRouter();
   const [cert, setCert] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    seedData();
-    const dog = getDog(cert.trim().toUpperCase());
-    if (!dog) {
+    setBusy(true);
+    const found = await findCertificate(cert);
+    setBusy(false);
+    if (!found) {
       setError("Certificado no encontrado. Revisa el número e inténtalo de nuevo.");
       return;
     }
-    router.push(`/certificado/${dog.certificateId}`);
+    router.push(`/certificado/${found.certificateId}`);
   }
 
   return (
@@ -46,13 +48,15 @@ export default function VerifyPage() {
             <p className="text-xs text-muted-foreground mt-1.5">Ingresa solo el número (sin guiones ni letras)</p>
           </div>
           {error && <p className="text-sm text-rose-500">{error}</p>}
-          <Button type="submit" variant="accent" size="lg" className="w-full">Verificar certificado</Button>
+          <Button type="submit" variant="accent" size="lg" className="w-full" disabled={busy}>
+            {busy ? "Verificando…" : "Verificar certificado"}
+          </Button>
         </form>
 
         <div className="mt-6 pt-6 border-t border-border">
-          <p className="text-sm font-medium mb-3">Prueba con estos certificados demo:</p>
+          <p className="text-sm font-medium mb-3">Prueba con estos certificados:</p>
           <div className="grid sm:grid-cols-2 gap-2">
-            {["29601", "29602", "28401", "28950", "27889", "26551"].map(c => (
+            {["23275", "23256", "23276", "07051", "18684", "21147"].map(c => (
               <button key={c} onClick={() => setCert(c)} className="text-left p-3 rounded-xl border border-border hover:border-amber-500 hover:bg-amber-500/5 transition font-mono text-xs">
                 Nro. {c}
               </button>

@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { Dog } from "@/lib/types";
-import { getDogs } from "@/lib/store";
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { calculateAge } from "@/lib/utils";
 import {
-  Dog as DogIcon, ShieldCheck, Cpu, Tag, MapPin, ZoomIn, ZoomOut, RotateCcw,
+  Dog as DogIcon, ShieldCheck, Cpu, Tag, MapPin, ZoomIn, ZoomOut, RotateCcw, Loader2,
 } from "lucide-react";
 
+type Dog = Tables<"dogs">;
 type Gen = 0 | 1 | 2 | 3;
 
 type Node = {
@@ -19,54 +21,59 @@ type Node = {
   gen: Gen;
 };
 
-function buildIndexes(dogs: Dog[]) {
-  const byId = new Map<string, Dog>();
+function norm(name: string | null | undefined) {
+  return (name || "").trim().toUpperCase();
+}
+
+/**
+ * Resuelve hasta 3 generaciones de ancestros cruzando sireName/damName por nombre
+ * contra la tabla dogs — los ejemplares migrados del WXR no tienen sire_id/dam_id
+ * (el cruce por ID no se intentó al importar por ser ambiguo), pero muchos padres
+ * están registrados como ejemplares propios y se resuelven así en tiempo de lectura.
+ */
+async function resolveGenerations(root: Dog) {
+  const supabase = createClient();
   const byName = new Map<string, Dog>();
-  for (const d of dogs) {
-    byId.set(d.id, d);
-    const key = d.name.trim().toUpperCase();
-    if (key && !byName.has(key)) byName.set(key, d);
+
+  async function fetchByNames(names: string[]) {
+    const wanted = Array.from(new Set(names.map(norm).filter(Boolean)));
+    const missing = wanted.filter(n => !byName.has(n));
+    if (missing.length === 0) return;
+    const { data } = await supabase.from("dogs").select("*").in("name", missing);
+    for (const d of data || []) byName.set(norm(d.name), d);
   }
-  return { byId, byName };
-}
 
-function resolveParent(
-  indexes: { byId: Map<string, Dog>; byName: Map<string, Dog> },
-  dog: Dog | null,
-  which: "sire" | "dam"
-): { dog: Dog | null; rawName: string } {
-  if (!dog) return { dog: null, rawName: "" };
-  const id = which === "sire" ? dog.sireId : dog.damId;
-  const name = (which === "sire" ? dog.sireName : dog.damName) || "";
-  if (id) {
-    const byId = indexes.byId.get(id);
-    if (byId) return { dog: byId, rawName: byId.name };
+  function resolve(dog: Dog | null, which: "sire" | "dam"): { dog: Dog | null; rawName: string } {
+    if (!dog) return { dog: null, rawName: "" };
+    const name = which === "sire" ? dog.sire_name : dog.dam_name;
+    const found = byName.get(norm(name)) || null;
+    return { dog: found, rawName: name || "" };
   }
-  const key = name.trim().toUpperCase();
-  if (key) {
-    const byName = indexes.byName.get(key);
-    if (byName) return { dog: byName, rawName: byName.name };
-  }
-  return { dog: null, rawName: name };
-}
 
-function buildTree(dog: Dog, indexes: { byId: Map<string, Dog>; byName: Map<string, Dog> }) {
-  const sire = resolveParent(indexes, dog, "sire");
-  const dam = resolveParent(indexes, dog, "dam");
+  await fetchByNames([root.sire_name || "", root.dam_name || ""]);
+  const sire = resolve(root, "sire");
+  const dam = resolve(root, "dam");
 
-  const sireSire = resolveParent(indexes, sire.dog, "sire");
-  const sireDam = resolveParent(indexes, sire.dog, "dam");
-  const damSire = resolveParent(indexes, dam.dog, "sire");
-  const damDam = resolveParent(indexes, dam.dog, "dam");
+  await fetchByNames([sire.dog?.sire_name || "", sire.dog?.dam_name || "", dam.dog?.sire_name || "", dam.dog?.dam_name || ""]);
+  const sireSire = resolve(sire.dog, "sire");
+  const sireDam = resolve(sire.dog, "dam");
+  const damSire = resolve(dam.dog, "sire");
+  const damDam = resolve(dam.dog, "dam");
 
-  const ggSireSireSire = resolveParent(indexes, sireSire.dog, "sire");
-  const ggSireSireDam = resolveParent(indexes, sireSire.dog, "dam");
-  const ggSireDamSire = resolveParent(indexes, sireDam.dog, "sire");
-  const ggSireDamDam = resolveParent(indexes, sireDam.dog, "dam");
-  const ggDamSireSire = resolveParent(indexes, damSire.dog, "sire");
-  const ggDamSireDam = resolveParent(indexes, damSire.dog, "dam");
-  const ggDamDamSire = resolveParent(indexes, damDam.dog, "sire");
-  const ggDamDamDam = resolveParent(indexes, damDam.dog, "dam");
+  await fetchByNames([
+    sireSire.dog?.sire_name || "", sireSire.dog?.dam_name || "",
+    sireDam.dog?.sire_name || "", sireDam.dog?.dam_name || "",
+    damSire.dog?.sire_name || "", damSire.dog?.dam_name || "",
+    damDam.dog?.sire_name || "", damDam.dog?.dam_name || "",
+  ]);
+  const ggSireSireSire = resolve(sireSire.dog, "sire");
+  const ggSireSireDam = resolve(sireSire.dog, "dam");
+  const ggSireDamSire = resolve(sireDam.dog, "sire");
+  const ggSireDamDam = resolve(sireDam.dog, "dam");
+  const ggDamSireSire = resolve(damSire.dog, "sire");
+  const ggDamSireDam = resolve(damSire.dog, "dam");
+  const ggDamDamSire = resolve(damDam.dog, "sire");
+  const ggDamDamDam = resolve(damDam.dog, "dam");
 
   const gen1: Node[] = [
     { ...sire, label: "Padre", gender: "male", gen: 1 },
@@ -122,13 +129,19 @@ function NodeCard({ node, isSubject }: { node: Node; isSubject?: boolean }) {
               : "bg-muted text-muted-foreground"
           }`}
         >
-          {dog?.photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={dog.photo} alt={dog.name} className="w-full h-full object-cover" />
+          {dog?.photo_url ? (
+            <Image
+              src={dog.photo_url}
+              alt={dog.name}
+              width={44}
+              height={44}
+              unoptimized={dog.photo_url.startsWith("data:")}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <DogIcon className="w-5 h-5" strokeWidth={1.75} />
           )}
-          {resolved && dog?.certificateId && (
+          {resolved && dog?.certificate_id && (
             <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-background">
               <ShieldCheck className="w-2.5 h-2.5 text-black" strokeWidth={3} />
             </span>
@@ -143,8 +156,8 @@ function NodeCard({ node, isSubject }: { node: Node; isSubject?: boolean }) {
 
           {resolved && dog && (
             <>
-              {dog.kennelName && (
-                <p className="text-[10px] text-muted-foreground truncate mt-0.5">{dog.kennelName}</p>
+              {dog.kennel_name && (
+                <p className="text-[10px] text-muted-foreground truncate mt-0.5">{dog.kennel_name}</p>
               )}
               <p className="text-[11px] font-medium text-amber-500 mt-1 truncate">
                 {dog.breed}{dog.variant ? ` · ${dog.variant}` : ""}
@@ -159,11 +172,11 @@ function NodeCard({ node, isSubject }: { node: Node; isSubject?: boolean }) {
         </div>
       </div>
 
-      {resolved && dog && (dog.certificateId || dog.microchip) && (
+      {resolved && dog && (dog.certificate_id || dog.microchip) && (
         <div className="mt-3 pt-3 border-t border-border/60 flex items-center gap-1.5 flex-wrap">
-          {dog.certificateId && (
+          {dog.certificate_id && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-background/70 border border-border text-[9px] font-mono text-muted-foreground">
-              <Tag className="w-2.5 h-2.5" /> {dog.certificateId}
+              <Tag className="w-2.5 h-2.5" /> {dog.certificate_id}
             </span>
           )}
           {dog.microchip && (
@@ -202,17 +215,36 @@ function Connector() {
 
 export function PedigreeTree({ dog }: { dog: Dog }) {
   const [scale, setScale] = useState(1);
-  const allDogs = useMemo(() => getDogs(), []);
-  const indexes = useMemo(() => buildIndexes(allDogs), [allDogs]);
-  const { gen1, gen2, gen3 } = useMemo(() => buildTree(dog, indexes), [dog, indexes]);
+  const [resolvedFor, setResolvedFor] = useState<string | null>(null);
+  const [gens, setGens] = useState<{ gen1: Node[]; gen2: Node[]; gen3: Node[] }>({ gen1: [], gen2: [], gen3: [] });
 
-  const resolvedCount =
-    1 + [...gen1, ...gen2, ...gen3].filter(n => n.dog).length;
+  useEffect(() => {
+    let cancelled = false;
+    resolveGenerations(dog).then(result => {
+      if (!cancelled) { setGens(result); setResolvedFor(dog.id); }
+    });
+    return () => { cancelled = true; };
+  }, [dog]);
+
+  const loading = resolvedFor !== dog.id;
+  const { gen1, gen2, gen3 } = gens;
+  const resolvedCount = useMemo(
+    () => 1 + [...gen1, ...gen2, ...gen3].filter(n => n.dog).length,
+    [gen1, gen2, gen3],
+  );
   const totalCount = 1 + gen1.length + gen2.length + gen3.length;
 
   function zoomIn() { setScale(s => Math.min(1.4, +(s + 0.1).toFixed(2))); }
   function zoomOut() { setScale(s => Math.max(0.5, +(s - 0.1).toFixed(2))); }
   function resetZoom() { setScale(1); }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground text-sm">
+        <Loader2 className="w-4 h-4 animate-spin" /> Cargando pedigree…
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -246,7 +278,7 @@ export function PedigreeTree({ dog }: { dog: Dog }) {
             <div className="flex flex-col justify-center">
               <NodeCard
                 isSubject
-                node={{ dog, rawName: dog.callName || dog.name, label: dog.name, gender: dog.gender, gen: 0 }}
+                node={{ dog, rawName: dog.call_name || dog.name, label: dog.name, gender: dog.gender === "female" ? "female" : "male", gen: 0 }}
               />
             </div>
 

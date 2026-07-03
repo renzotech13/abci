@@ -1,35 +1,30 @@
-"use client";
-
-import { useEffect, useState, use, Suspense } from "react";
-import { getDog, seedData } from "@/lib/store";
-import type { Dog } from "@/lib/types";
-import { Card, Button, LinkButton, Badge } from "@/components/ui";
+import Image from "next/image";
+import { headers } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
+import { LinkButton, Badge } from "@/components/ui";
 import { QRCode } from "@/components/QRCode";
 import { formatDate, calculateAge } from "@/lib/utils";
-import { useSearchParams } from "next/navigation";
+import { PrintButton } from "./PrintButton";
 import {
-  PartyPopper, ShieldCheck, Eye, Printer, XCircle,
+  PartyPopper, ShieldCheck, Eye, XCircle,
   Package, ArrowLeftRight, GitBranch, Trophy,
 } from "lucide-react";
 
-function CertificateInner({ id }: { id: string }) {
-  const [dog, setDog] = useState<Dog | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [verifyUrl, setVerifyUrl] = useState("");
-  const searchParams = useSearchParams();
-  const isNew = searchParams.get("new") === "1";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  useEffect(() => {
-    seedData();
-    const d = getDog(id);
-    setDog(d);
-    setLoading(false);
-    if (d && typeof window !== "undefined") {
-      setVerifyUrl(`${window.location.origin}/certificado/${d.certificateId}`);
-    }
-  }, [id]);
+export default async function CertificatePage({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { id } = await params;
+  const { new: isNewParam } = await searchParams;
+  const isNew = isNewParam === "1";
 
-  if (loading) return <div className="py-20 text-center text-muted-foreground">Cargando certificado…</div>;
+  const supabase = await createClient();
+  const filter = UUID_RE.test(id) ? `id.eq.${id},certificate_id.eq.${id}` : `certificate_id.eq.${id}`;
+  const { data: dog } = await supabase.from("dogs").select("*").or(filter).maybeSingle();
 
   if (!dog) {
     return (
@@ -41,6 +36,11 @@ function CertificateInner({ id }: { id: string }) {
       </div>
     );
   }
+
+  const hdrs = await headers();
+  const host = hdrs.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const verifyUrl = host ? `${protocol}://${host}/certificado/${dog.certificate_id}` : dog.certificate_id;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -62,7 +62,7 @@ function CertificateInner({ id }: { id: string }) {
         </div>
         <div className="flex gap-2">
           <LinkButton href={`/ejemplar/${dog.id}`} variant="outline" size="sm"><Eye className="w-3.5 h-3.5" /> Ver perfil</LinkButton>
-          <Button variant="accent" size="sm" onClick={() => window.print()}><Printer className="w-3.5 h-3.5" /> Imprimir</Button>
+          <PrintButton />
         </div>
       </div>
 
@@ -86,49 +86,55 @@ function CertificateInner({ id }: { id: string }) {
 
         <div className="grid md:grid-cols-3 gap-6 items-center mb-8">
           <div className="md:col-span-2 flex items-start gap-4">
-            {dog.photo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={dog.photo} alt={dog.name} className="w-20 h-20 rounded-xl object-cover border border-border shrink-0" />
+            {dog.photo_url && (
+              <Image
+                src={dog.photo_url}
+                alt={dog.name}
+                width={80}
+                height={80}
+                unoptimized={dog.photo_url.startsWith("data:")}
+                className="w-20 h-20 rounded-xl object-cover border border-border shrink-0"
+              />
             )}
             <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Este documento certifica que</p>
             <h2 className="font-display text-3xl sm:text-4xl font-semibold mt-2 leading-tight">{dog.name}</h2>
-            {dog.callName && <p className="text-sm text-muted-foreground mt-1">&quot;{dog.callName}&quot;</p>}
+            {dog.call_name && <p className="text-sm text-muted-foreground mt-1">&quot;{dog.call_name}&quot;</p>}
             <p className="text-sm mt-4">se encuentra registrado en ABCI World Wide como <span className="font-semibold">{dog.breed}{dog.variant ? ` (${dog.variant})` : ""}</span>, con el siguiente número oficial:</p>
-            <p className="font-mono font-bold text-3xl mt-3 tracking-wider text-amber-500 tabular-nums">{dog.certificateId}</p>
+            <p className="font-mono font-bold text-3xl mt-3 tracking-wider text-amber-500 tabular-nums">{dog.certificate_id}</p>
             </div>
           </div>
           <div className="flex flex-col items-center gap-2">
             <div className="p-3 bg-white rounded-2xl border border-border">
-              <QRCode value={verifyUrl || dog.certificateId} size={132} />
+              <QRCode value={verifyUrl} size={132} />
             </div>
             <p className="text-[10px] text-muted-foreground text-center">Escanea para verificar</p>
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 mb-8 p-5 rounded-2xl bg-background/70 border border-border">
-          <Field label="Fecha de nacimiento" value={formatDate(dog.dob)} />
-          <Field label="Edad" value={calculateAge(dog.dob)} />
+          <Field label="Fecha de nacimiento" value={dog.dob ? formatDate(dog.dob) : "No registrada"} />
+          <Field label="Edad" value={dog.dob ? calculateAge(dog.dob) : "—"} />
           <Field label="Sexo" value={dog.gender === "male" ? "Macho" : "Hembra"} />
-          <Field label="Color" value={dog.color} />
+          <Field label="Color" value={dog.color || "—"} />
           {dog.weight && <Field label="Peso" value={`${dog.weight} kg`} />}
           {dog.height && <Field label="Altura" value={`${dog.height} cm`} />}
           <Field label="Microchip" value={dog.microchip || "No proporcionado"} mono />
-          <Field label="Criadero" value={dog.kennelName || "Independiente"} />
-          <Field label="Criador" value={dog.breederName || "—"} />
+          <Field label="Criadero" value={dog.kennel_name || "Independiente"} />
+          <Field label="Criador" value={dog.breeder_name || "—"} />
           <Field label="Ubicación" value={dog.location || "—"} />
-          <Field label="Fecha de registro" value={formatDate(dog.registrationDate)} />
+          <Field label="Fecha de registro" value={formatDate(dog.registration_date)} />
           <Field label="Estado" value={dog.status === "active" ? "ACTIVO" : dog.status.toUpperCase()} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4 mb-8">
           <div className="p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Padre</p>
-            <p className="font-semibold mt-1">{dog.sireName || "Desconocido"}</p>
+            <p className="font-semibold mt-1">{dog.sire_name || "Desconocido"}</p>
           </div>
           <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Madre</p>
-            <p className="font-semibold mt-1">{dog.damName || "Desconocida"}</p>
+            <p className="font-semibold mt-1">{dog.dam_name || "Desconocida"}</p>
           </div>
         </div>
 
@@ -147,8 +153,8 @@ function CertificateInner({ id }: { id: string }) {
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Registrador General — ABCI World Wide</p>
           </div>
           <div className="text-right text-[10px] text-muted-foreground">
-            <p>Emitido el {formatDate(dog.registrationDate)}</p>
-            <p className="font-mono mt-1">Hash: {dog.certificateId}-{Date.now().toString(36).slice(-6).toUpperCase()}</p>
+            <p>Emitido el {formatDate(dog.registration_date)}</p>
+            <p className="font-mono mt-1">Hash: {dog.certificate_id}-{dog.id.slice(0, 6).toUpperCase()}</p>
           </div>
         </div>
       </div>
@@ -176,14 +182,5 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
       <p className={`text-sm font-semibold mt-0.5 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
-  );
-}
-
-export default function CertificatePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  return (
-    <Suspense fallback={<div className="py-20 text-center text-muted-foreground">Cargando…</div>}>
-      <CertificateInner id={id} />
-    </Suspense>
   );
 }

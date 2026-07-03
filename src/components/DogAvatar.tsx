@@ -1,5 +1,8 @@
 import { cn } from "@/lib/utils";
 import { Dog } from "lucide-react";
+import Image from "next/image";
+
+const PIXELS = { sm: 40, md: 56, lg: 80, xl: 128 } as const;
 
 export function DogAvatar({
   name, size = "md", color = "amber", photoUrl,
@@ -22,11 +25,14 @@ export function DogAvatar({
   const s = sizes[size];
 
   if (photoUrl) {
+    const px = PIXELS[size];
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={photoUrl}
         alt={name}
+        width={px}
+        height={px}
+        unoptimized={photoUrl.startsWith("data:")}
         className={cn("rounded-2xl object-cover shadow-sm shrink-0", s.box)}
       />
     );

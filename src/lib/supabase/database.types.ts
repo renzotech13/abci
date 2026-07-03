@@ -185,6 +185,7 @@ export type Database = {
           dob: string | null
           gender: string
           grandparents: Json | null
+          has_photo: boolean | null
           height: number | null
           id: string
           kennel_name: string | null
@@ -221,6 +222,7 @@ export type Database = {
           dob?: string | null
           gender: string
           grandparents?: Json | null
+          has_photo?: boolean | null
           height?: number | null
           id?: string
           kennel_name?: string | null
@@ -257,6 +259,7 @@ export type Database = {
           dob?: string | null
           gender?: string
           grandparents?: Json | null
+          has_photo?: boolean | null
           height?: number | null
           id?: string
           kennel_name?: string | null

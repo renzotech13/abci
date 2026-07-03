@@ -29,6 +29,7 @@ export default async function EjemplaresPage({
   let query = supabase
     .from("dogs")
     .select("*", { count: "exact" })
+    .order("has_photo", { ascending: false })
     .order("registration_date", { ascending: false });
 
   if (gender !== "all") query = query.eq("gender", gender);

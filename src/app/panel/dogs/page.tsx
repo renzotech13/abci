@@ -2,32 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getMyDogs, deleteDog } from "@/lib/store";
-import type { Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { LinkButton, Card, Badge, Empty, Input, Button } from "@/components/ui";
 import { DogAvatar } from "@/components/DogAvatar";
 import Link from "next/link";
 import { formatShortDate, calculateAge } from "@/lib/utils";
 import { Plus, Trophy, Trash2, Eye, FileText } from "lucide-react";
 
+type Dog = Tables<"dogs">;
+
 export default function MyDogsPage() {
   const [dogs, setDogs] = useState<Dog[]>([]);
   const [query, setQuery] = useState("");
   const [filterGender, setFilterGender] = useState<"all" | "male" | "female">("all");
 
-  useEffect(() => { setDogs(getMyDogs()); }, []);
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    const { data: rows } = await supabase.from("dogs").select("*").eq("owner_id", data.user.id);
+    setDogs(rows ?? []);
+  }
+
+  useEffect(() => { refresh(); }, []);
 
   const filtered = dogs.filter(d => {
     if (filterGender !== "all" && d.gender !== filterGender) return false;
-    if (query && !`${d.name} ${d.callName} ${d.certificateId} ${d.color}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !`${d.name} ${d.call_name} ${d.certificate_id} ${d.color}`.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
-  function handleDelete(id: string, name: string) {
-    if (confirm(`¿Eliminar a ${name} de tu criadero? Esta acción no se puede deshacer.`)) {
-      deleteDog(id);
-      setDogs(getMyDogs());
-    }
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`¿Eliminar a ${name} de tu criadero? Esta acción no se puede deshacer.`)) return;
+    const supabase = createClient();
+    await supabase.from("dogs").delete().eq("id", id);
+    refresh();
   }
 
   return (
@@ -68,18 +78,18 @@ export default function MyDogsPage() {
           {filtered.map(d => (
             <Card key={d.id} className="hover:border-amber-500/40 transition">
               <div className="flex items-start gap-4">
-                <DogAvatar name={d.name} size="lg" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo} />
+                <DogAvatar name={d.name} size="lg" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo_url ?? undefined} />
                 <div className="flex-1 min-w-0">
                   <Link href={`/ejemplar/${d.id}`} className="font-semibold text-lg hover:text-amber-500">{d.name}</Link>
-                  {d.callName && <p className="text-sm text-muted-foreground">&quot;{d.callName}&quot;</p>}
-                  <p className="text-xs text-muted-foreground font-mono mt-1">Nro. {d.certificateId}</p>
+                  {d.call_name && <p className="text-sm text-muted-foreground">&quot;{d.call_name}&quot;</p>}
+                  <p className="text-xs text-muted-foreground font-mono mt-1">Nro. {d.certificate_id}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge>{d.gender === "male" ? "♂ Macho" : "♀ Hembra"}</Badge>
                     <Badge>{d.variant || d.breed}</Badge>
-                    <Badge variant="accent">{d.color}</Badge>
+                    {d.color && <Badge variant="accent">{d.color}</Badge>}
                   </div>
                   <div className="mt-3 text-xs text-muted-foreground">
-                    <p>Edad: {calculateAge(d.dob)} · Nac. {formatShortDate(d.dob)}</p>
+                    <p>{d.dob ? `Edad: ${calculateAge(d.dob)} · Nac. ${formatShortDate(d.dob)}` : "Fecha de nacimiento no registrada"}</p>
                     {d.titles && d.titles.length > 0 && (
                       <p className="mt-1 inline-flex items-center gap-1">
                         <Trophy className="w-3 h-3 text-amber-500" /> {d.titles.join(", ")}
@@ -90,7 +100,7 @@ export default function MyDogsPage() {
               </div>
               <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2">
                 <LinkButton href={`/ejemplar/${d.id}`} variant="outline" size="sm"><Eye className="w-3.5 h-3.5" /> Ver</LinkButton>
-                <LinkButton href={`/certificado/${d.certificateId}`} variant="outline" size="sm"><FileText className="w-3.5 h-3.5" /> Certificado</LinkButton>
+                <LinkButton href={`/certificado/${d.certificate_id}`} variant="outline" size="sm"><FileText className="w-3.5 h-3.5" /> Certificado</LinkButton>
                 <Button onClick={() => handleDelete(d.id, d.name)} variant="ghost" size="sm" className="text-rose-500 ml-auto"><Trash2 className="w-3.5 h-3.5" /> Eliminar</Button>
               </div>
             </Card>

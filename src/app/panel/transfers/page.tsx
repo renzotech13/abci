@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getMyDogs, getMyTransfers, addTransfer, updateTransfer } from "@/lib/store";
-import type { Dog, Transfer } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { approveTransfer } from "@/lib/transfers";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Button, Input, Label, Select, Badge, Empty } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import { Plus, Clock, CheckCircle2, XCircle } from "lucide-react";
 
+type Dog = Tables<"dogs">;
+type Transfer = Tables<"transfers">;
+
 export default function TransfersPage() {
+  const [userId, setUserId] = useState<string | null>(null);
   const [dogs, setDogs] = useState<Dog[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [creating, setCreating] = useState(false);
@@ -16,30 +21,39 @@ export default function TransfersPage() {
   const [toEmail, setToEmail] = useState("");
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
-    setDogs(getMyDogs());
-    setTransfers(getMyTransfers());
-  }, []);
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    setUserId(data.user.id);
+    const { data: myDogs } = await supabase.from("dogs").select("*").eq("owner_id", data.user.id);
+    setDogs(myDogs ?? []);
+    const { data: myTransfers } = await supabase.from("transfers").select("*").eq("from_user_id", data.user.id);
+    setTransfers(myTransfers ?? []);
+  }
 
-  function refresh() { setTransfers(getMyTransfers()); }
+  useEffect(() => { refresh(); }, []);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const dog = dogs.find(d => d.id === dogId);
-    if (!dog) return;
-    addTransfer({ dogId, fromUserId: dog.ownerId, toEmail, notes });
+    if (!dog || !userId) return;
+    const supabase = createClient();
+    await supabase.from("transfers").insert({ dog_id: dogId, from_user_id: userId, to_email: toEmail, notes: notes || null });
     setCreating(false);
     setDogId(""); setToEmail(""); setNotes("");
     refresh();
   }
 
-  function approve(id: string) {
-    updateTransfer(id, { status: "approved", completedAt: new Date().toISOString() });
+  async function approve(t: Transfer) {
+    const supabase = createClient();
+    await approveTransfer(supabase, t);
     refresh();
   }
 
-  function cancel(id: string) {
-    updateTransfer(id, { status: "rejected" });
+  async function cancel(id: string) {
+    const supabase = createClient();
+    await supabase.from("transfers").update({ status: "rejected" }).eq("id", id);
     refresh();
   }
 
@@ -61,13 +75,13 @@ export default function TransfersPage() {
               <Label htmlFor="d">Ejemplar</Label>
               <Select id="d" required value={dogId} onChange={e => setDogId(e.target.value)}>
                 <option value="">Selecciona el ejemplar a traspasar...</option>
-                {dogs.map(d => <option key={d.id} value={d.id}>{d.name} — Nro. {d.certificateId}</option>)}
+                {dogs.map(d => <option key={d.id} value={d.id}>{d.name} — Nro. {d.certificate_id}</option>)}
               </Select>
             </div>
             <div>
               <Label htmlFor="e">Correo del nuevo propietario</Label>
               <Input id="e" type="email" required value={toEmail} onChange={e => setToEmail(e.target.value)} placeholder="nuevo-dueno@ejemplo.com" />
-              <p className="text-xs text-muted-foreground mt-1">El destinatario recibirá un correo para confirmar y aceptar la titularidad.</p>
+              <p className="text-xs text-muted-foreground mt-1">Si el destinatario ya tiene cuenta ABCI, la titularidad se reasigna automáticamente al aprobar.</p>
             </div>
             <div>
               <Label htmlFor="n">Notas</Label>
@@ -86,15 +100,15 @@ export default function TransfersPage() {
       ) : (
         <div className="space-y-3">
           {transfers.map(t => {
-            const dog = dogs.find(d => d.id === t.dogId);
+            const dog = dogs.find(d => d.id === t.dog_id);
             return (
               <Card key={t.id}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-semibold">{dog?.name || "Ejemplar"}</p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">Nro. {dog?.certificateId}</p>
-                    <p className="text-sm mt-2">Para: <span className="font-medium">{t.toEmail}</span></p>
-                    <p className="text-xs text-muted-foreground">Solicitado el {formatShortDate(t.requestedAt)}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">Nro. {dog?.certificate_id}</p>
+                    <p className="text-sm mt-2">Para: <span className="font-medium">{t.to_email}</span></p>
+                    <p className="text-xs text-muted-foreground">Solicitado el {formatShortDate(t.requested_at)}</p>
                     {t.notes && <p className="text-sm text-muted-foreground mt-2 italic">&quot;{t.notes}&quot;</p>}
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -104,7 +118,7 @@ export default function TransfersPage() {
                     {t.status === "pending" && (
                       <div className="flex gap-2">
                         <Button onClick={() => cancel(t.id)} variant="ghost" size="sm">Cancelar</Button>
-                        <Button onClick={() => approve(t.id)} variant="accent" size="sm">Simular aprobación</Button>
+                        <Button onClick={() => approve(t)} variant="accent" size="sm">Aprobar</Button>
                       </div>
                     )}
                   </div>

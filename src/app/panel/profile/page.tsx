@@ -2,27 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getCurrentUser, updateUser } from "@/lib/store";
-import type { User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 import { Card, Button, Input, Label, Textarea, Badge } from "@/components/ui";
 import { CheckCircle2 } from "lucide-react";
 
+type Profile = Tables<"profiles">;
+
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [form, setForm] = useState<Partial<User>>({});
+  const [user, setUser] = useState<Profile | null>(null);
+  const [form, setForm] = useState<Partial<Profile>>({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const u = getCurrentUser();
-    if (u) {
-      setUser(u);
-      setForm(u);
-    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
+      if (profile) { setUser(profile); setForm(profile); }
+    });
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const updated = updateUser(form);
+    if (!user) return;
+    const supabase = createClient();
+    const patch: TablesUpdate<"profiles"> = {
+      name: form.name, kennel_name: form.kennel_name, affix: form.affix,
+      country: form.country, phone: form.phone, bio: form.bio,
+    };
+    const { data: updated } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").maybeSingle();
     if (updated) {
       setUser(updated);
       setSaved(true);
@@ -56,7 +65,7 @@ export default function ProfilePage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="k">Nombre del criadero</Label>
-                <Input id="k" value={form.kennelName || ""} onChange={e => setForm({ ...form, kennelName: e.target.value })} />
+                <Input id="k" value={form.kennel_name || ""} onChange={e => setForm({ ...form, kennel_name: e.target.value })} />
               </div>
               <div>
                 <Label htmlFor="a">Afijo registrado</Label>
@@ -101,7 +110,7 @@ export default function ProfilePage() {
           </Card>
           <Card>
             <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Cuenta</p>
-            <p className="text-sm mt-2">Miembro desde {new Date(user.createdAt).getFullYear()}</p>
+            <p className="text-sm mt-2">Miembro desde {new Date(user.created_at).getFullYear()}</p>
             <p className="text-xs text-muted-foreground mt-1 font-mono">{user.id}</p>
           </Card>
         </div>

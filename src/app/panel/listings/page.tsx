@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getMarketplace, getCurrentUser, addListing } from "@/lib/store";
-import type { MarketplaceListing, User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Button, Input, Label, Select, Badge, Empty } from "@/components/ui";
 import { currency, formatShortDate } from "@/lib/utils";
 import { Plus, ShoppingBag, Baby, Dog as DogIcon, Heart, Package, type LucideIcon } from "lucide-react";
 
-const TYPE_ICON: Record<MarketplaceListing["type"], LucideIcon> = {
+type Profile = Tables<"profiles">;
+type Listing = Tables<"marketplace_listings">;
+
+const TYPE_ICON: Record<string, LucideIcon> = {
   puppy: Baby,
   adult: DogIcon,
   stud: Heart,
@@ -16,31 +19,41 @@ const TYPE_ICON: Record<MarketplaceListing["type"], LucideIcon> = {
 };
 
 export default function MyListingsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
-    type: "puppy" as MarketplaceListing["type"],
-    title: "", description: "", price: "", location: "",
+    type: "puppy", title: "", description: "", price: "", location: "",
   });
 
+  async function refresh(uid: string) {
+    const supabase = createClient();
+    const { data } = await supabase.from("marketplace_listings").select("*").eq("seller_id", uid);
+    setListings(data ?? []);
+  }
+
   useEffect(() => {
-    const u = getCurrentUser();
-    setUser(u);
-    if (u) setListings(getMarketplace().filter(l => l.sellerId === u.id));
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
+      setUser(profile);
+      if (profile) refresh(profile.id);
+    });
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-    addListing({
+    const supabase = createClient();
+    await supabase.from("marketplace_listings").insert({
       type: form.type, title: form.title, description: form.description,
       price: Number(form.price), currency: "USD", location: form.location,
-      sellerId: user.id, sellerName: user.kennelName || user.name, image: "",
+      seller_id: user.id, seller_name: user.kennel_name || user.name, image: "",
     });
     setCreating(false);
     setForm({ type: "puppy", title: "", description: "", price: "", location: "" });
-    setListings(getMarketplace().filter(l => l.sellerId === user.id));
+    refresh(user.id);
   }
 
   return (
@@ -60,7 +73,7 @@ export default function MyListingsPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="t">Tipo</Label>
-                <Select id="t" value={form.type} onChange={e => setForm({ ...form, type: e.target.value as MarketplaceListing["type"] })}>
+                <Select id="t" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                   <option value="puppy">Cachorro</option>
                   <option value="adult">Ejemplar adulto</option>
                   <option value="stud">Servicio de monta</option>

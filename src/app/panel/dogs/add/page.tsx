@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { addDog, getCurrentUser } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Card, Select } from "@/components/ui";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
@@ -14,42 +14,64 @@ const COLORS = ["Negro sólido", "Azul", "Azul tri", "Chocolate", "Chocolate tri
 
 export default function AddDogPage() {
   const router = useRouter();
-  const user = typeof window !== "undefined" ? getCurrentUser() : null;
+  const [userId, setUserId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     name: "", callName: "", breed: "American Bully", variant: "Standard",
     gender: "male" as "male" | "female", color: "Negro sólido",
     weight: "", height: "", dob: "", microchip: "",
     sireName: "", damName: "",
-    kennelName: user?.kennelName || "",
-    breederName: user?.name || "",
+    kennelName: "",
+    breederName: "",
     location: "",
     notes: "",
     photo: undefined as string | undefined,
   });
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      setUserId(data.user.id);
+      const { data: profile } = await supabase.from("profiles").select("kennel_name, name").eq("id", data.user.id).maybeSingle();
+      if (profile) {
+        setForm(f => ({ ...f, kennelName: profile.kennel_name || "", breederName: profile.name || "" }));
+      }
+    });
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const dog = addDog({
+    if (!userId) return;
+    setSubmitting(true);
+    const supabase = createClient();
+    const { data: certId } = await supabase.rpc("generate_certificate_id");
+    const { data: dog, error } = await supabase.from("dogs").insert({
+      certificate_id: certId as string,
+      owner_id: userId,
       name: form.name.toUpperCase(),
-      callName: form.callName,
+      call_name: form.callName || null,
       breed: form.breed,
       variant: form.variant,
       gender: form.gender,
       color: form.color,
-      weight: form.weight ? Number(form.weight) : undefined,
-      height: form.height ? Number(form.height) : undefined,
-      dob: form.dob,
-      microchip: form.microchip,
-      sireName: form.sireName,
-      damName: form.damName,
-      kennelName: form.kennelName,
-      breederName: form.breederName,
-      location: form.location,
-      notes: form.notes,
-      photo: form.photo,
-    });
-    router.push(`/certificado/${dog.certificateId}?new=1`);
+      weight: form.weight ? Number(form.weight) : null,
+      height: form.height ? Number(form.height) : null,
+      dob: form.dob || null,
+      microchip: form.microchip || null,
+      sire_name: form.sireName || null,
+      dam_name: form.damName || null,
+      kennel_name: form.kennelName || null,
+      breeder_name: form.breederName || null,
+      location: form.location || null,
+      notes: form.notes || null,
+      photo_url: form.photo || null,
+      source: "app",
+    }).select("certificate_id").single();
+    setSubmitting(false);
+    if (error || !dog) { alert("No se pudo registrar el ejemplar. Intenta de nuevo."); return; }
+    router.push(`/certificado/${dog.certificate_id}?new=1`);
   }
 
   return (
@@ -185,7 +207,7 @@ export default function AddDogPage() {
             {step < 3 ? (
               <Button type="button" variant="accent" onClick={() => setStep(step + 1)}>Continuar <ArrowRight className="w-4 h-4" /></Button>
             ) : (
-              <Button type="submit" variant="accent"><Sparkles className="w-4 h-4" /> Generar certificado</Button>
+              <Button type="submit" variant="accent" disabled={submitting}><Sparkles className="w-4 h-4" /> {submitting ? "Generando…" : "Generar certificado"}</Button>
             )}
           </div>
         </form>

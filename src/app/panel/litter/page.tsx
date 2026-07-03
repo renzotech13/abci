@@ -3,21 +3,25 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { addDog, getMyDogs, addLitter, getLitters } from "@/lib/store";
-import type { Dog, Litter } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Button, Input, Label, Select, Badge, Empty } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import { Plus, X, Users2 } from "lucide-react";
 
+type Dog = Tables<"dogs">;
+type Litter = Tables<"litters">;
 type Puppy = { name: string; gender: "male" | "female"; color: string };
 
 const COLORS = ["Negro sólido", "Azul", "Azul tri", "Chocolate", "Chocolate tri", "Lila", "Merle azul", "Champagne", "Atigrado", "Leonado"];
 
 export default function LitterPage() {
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
   const [dogs, setDogs] = useState<Dog[]>([]);
   const [litters, setLitters] = useState<Litter[]>([]);
   const [creating, setCreating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [sireId, setSireId] = useState("");
   const [damId, setDamId] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -25,10 +29,18 @@ export default function LitterPage() {
     { name: "", gender: "male", color: "Negro sólido" },
   ]);
 
-  useEffect(() => {
-    setDogs(getMyDogs());
-    setLitters(getLitters());
-  }, []);
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    setUserId(data.user.id);
+    const { data: myDogs } = await supabase.from("dogs").select("*").eq("owner_id", data.user.id);
+    setDogs(myDogs ?? []);
+    const { data: myLitters } = await supabase.from("litters").select("*").eq("owner_id", data.user.id);
+    setLitters(myLitters ?? []);
+  }
+
+  useEffect(() => { refresh(); }, []);
 
   const males = dogs.filter(d => d.gender === "male");
   const females = dogs.filter(d => d.gender === "female");
@@ -39,37 +51,44 @@ export default function LitterPage() {
     setPuppies(puppies.map((p, idx) => idx === i ? { ...p, ...patch } : p));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const sire = dogs.find(d => d.id === sireId);
     const dam = dogs.find(d => d.id === damId);
-    if (!sire || !dam) return;
+    if (!sire || !dam || !userId) return;
+    setSubmitting(true);
+    const supabase = createClient();
     const puppyIds: string[] = [];
     for (const p of puppies) {
       if (!p.name) continue;
-      const dog = addDog({
+      const { data: certId } = await supabase.rpc("generate_certificate_id");
+      const { data: puppy } = await supabase.from("dogs").insert({
+        certificate_id: certId as string,
+        owner_id: userId,
         name: p.name.toUpperCase(),
         breed: sire.breed,
         variant: sire.variant,
         gender: p.gender,
         color: p.color,
         dob: birthDate,
-        sireId: sire.id,
-        damId: dam.id,
-        sireName: sire.name,
-        damName: dam.name,
-        kennelName: sire.kennelName,
-        breederName: sire.breederName,
-      });
-      puppyIds.push(dog.id);
+        sire_id: sire.id,
+        dam_id: dam.id,
+        sire_name: sire.name,
+        dam_name: dam.name,
+        kennel_name: sire.kennel_name,
+        breeder_name: sire.breeder_name,
+        source: "app",
+      }).select("id").single();
+      if (puppy) puppyIds.push(puppy.id);
     }
-    addLitter({
-      ownerId: sire.ownerId,
-      sireId: sire.id,
-      damId: dam.id,
-      birthDate,
-      puppyIds,
+    await supabase.from("litters").insert({
+      owner_id: userId,
+      sire_id: sire.id,
+      dam_id: dam.id,
+      birth_date: birthDate,
+      puppy_ids: puppyIds,
     });
+    setSubmitting(false);
     router.push("/panel/dogs");
   }
 
@@ -133,7 +152,7 @@ export default function LitterPage() {
 
             <div className="flex gap-3 pt-3 border-t border-border">
               <Button type="button" variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
-              <Button type="submit" variant="accent">Registrar camada</Button>
+              <Button type="submit" variant="accent" disabled={submitting}>{submitting ? "Registrando…" : "Registrar camada"}</Button>
             </div>
           </form>
         </Card>
@@ -153,8 +172,8 @@ export default function LitterPage() {
                     <Users2 className="w-5 h-5 text-amber-500" />
                   </div>
                   <div>
-                    <p className="font-semibold">Camada nacida el {formatShortDate(l.birthDate)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{l.puppyIds.length} cachorros registrados</p>
+                    <p className="font-semibold">Camada nacida el {formatShortDate(l.birth_date)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{l.puppy_ids.length} cachorros registrados</p>
                   </div>
                 </div>
                 <Badge variant="success">Activa</Badge>

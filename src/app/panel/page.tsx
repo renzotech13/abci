@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getCurrentUser, getMyDogs, getHealthRecords, getMyTransfers } from "@/lib/store";
-import type { User, Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { LinkButton, Card, Badge, Empty } from "@/components/ui";
 import { Reveal } from "@/components/Reveal";
 import { DogAvatar } from "@/components/DogAvatar";
@@ -14,17 +14,36 @@ import {
   PlusCircle, Users2, Sparkles, Lightbulb, ChevronRight,
 } from "lucide-react";
 
+type Profile = Tables<"profiles">;
+type Dog = Tables<"dogs">;
+
 export default function DashboardOverview() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [dogs, setDogs] = useState<Dog[]>([]);
   const [healthCount, setHealthCount] = useState(0);
   const [transferCount, setTransferCount] = useState(0);
 
   useEffect(() => {
-    setUser(getCurrentUser());
-    setDogs(getMyDogs());
-    setHealthCount(getHealthRecords().length);
-    setTransferCount(getMyTransfers().length);
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data }) => {
+      const authUser = data.user;
+      if (!authUser) return;
+
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
+      setUser(profile);
+
+      const { data: myDogs } = await supabase.from("dogs").select("*").eq("owner_id", authUser.id);
+      setDogs(myDogs ?? []);
+
+      const dogIds = (myDogs ?? []).map(d => d.id);
+      if (dogIds.length > 0) {
+        const { count } = await supabase.from("health_records").select("*", { count: "exact", head: true }).in("dog_id", dogIds);
+        setHealthCount(count ?? 0);
+      }
+
+      const { count: tCount } = await supabase.from("transfers").select("*", { count: "exact", head: true }).eq("from_user_id", authUser.id);
+      setTransferCount(tCount ?? 0);
+    });
   }, []);
 
   return (
@@ -71,14 +90,14 @@ export default function DashboardOverview() {
             <div className="space-y-3">
               {dogs.slice(0, 5).map(d => (
                 <Link href={`/ejemplar/${d.id}`} key={d.id} className="group flex items-center gap-4 p-4 rounded-2xl border border-border bg-card transition-all duration-200 hover:border-amber-500/50 hover:shadow-elevation-2 hover:-translate-y-0.5 cursor-pointer">
-                  <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo} />
+                  <DogAvatar name={d.name} size="md" color={d.gender === "male" ? "indigo" : "rose"} photoUrl={d.photo_url ?? undefined} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p className="font-semibold truncate">{d.name}</p>
                       <Badge>{d.gender === "male" ? "♂" : "♀"} {d.variant || d.breed}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono">Nro. {d.certificateId}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{d.color} • {calculateAge(d.dob)} • Nac. {formatShortDate(d.dob)}</p>
+                    <p className="text-xs text-muted-foreground font-mono">Nro. {d.certificate_id}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{d.color} • {d.dob ? calculateAge(d.dob) : "—"} • {d.dob ? `Nac. ${formatShortDate(d.dob)}` : ""}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
                 </Link>

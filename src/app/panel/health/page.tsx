@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { getMyDogs, getHealthRecords, addHealthRecord, deleteHealthRecord } from "@/lib/store";
-import type { Dog, HealthRecord } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Button, Input, Label, Select, Badge, Empty } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import {
   Syringe, Stethoscope, FlaskConical, Pill, Scale, ClipboardList,
   Plus, Trash2,
 } from "lucide-react";
+
+type Dog = Tables<"dogs">;
+type HealthRecord = Tables<"health_records">;
 
 const TYPES = [
   { value: "vaccination", label: "Vacunación", Icon: Syringe },
@@ -29,27 +32,37 @@ export default function HealthVaultPage() {
     dogId: "", type: "vaccination" as HealthRecord["type"], title: "", date: "", vet: "", notes: "",
   });
 
-  useEffect(() => {
-    setDogs(getMyDogs());
-    refresh();
-  }, []);
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    const { data: myDogs } = await supabase.from("dogs").select("*").eq("owner_id", data.user.id);
+    setDogs(myDogs ?? []);
+    const dogIds = (myDogs ?? []).map(d => d.id);
+    if (dogIds.length === 0) { setRecords([]); return; }
+    const { data: recs } = await supabase.from("health_records").select("*").in("dog_id", dogIds);
+    setRecords(recs ?? []);
+  }
 
-  function refresh() { setRecords(getHealthRecords()); }
+  useEffect(() => { refresh(); }, []);
 
-  const filtered = filterDog ? records.filter(r => r.dogId === filterDog) : records;
-  const myDogIds = new Set(dogs.map(d => d.id));
-  const visible = filtered.filter(r => myDogIds.has(r.dogId));
+  const filtered = filterDog ? records.filter(r => r.dog_id === filterDog) : records;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    addHealthRecord(form);
+    const supabase = createClient();
+    await supabase.from("health_records").insert({
+      dog_id: form.dogId, type: form.type, title: form.title, date: form.date,
+      vet: form.vet || null, notes: form.notes || null,
+    });
     setCreating(false);
     setForm({ dogId: "", type: "vaccination", title: "", date: "", vet: "", notes: "" });
     refresh();
   }
 
-  function handleDelete(id: string) {
-    deleteHealthRecord(id);
+  async function handleDelete(id: string) {
+    const supabase = createClient();
+    await supabase.from("health_records").delete().eq("id", id);
     refresh();
   }
 
@@ -115,12 +128,12 @@ export default function HealthVaultPage() {
         </Select>
       </div>
 
-      {visible.length === 0 ? (
+      {filtered.length === 0 ? (
         <Empty title="Sin registros de salud" description="Agrega vacunas, chequeos y análisis para construir el historial veterinario completo de tu ejemplar." />
       ) : (
         <div className="space-y-3">
-          {visible.sort((a, b) => b.date.localeCompare(a.date)).map(r => {
-            const dog = dogs.find(d => d.id === r.dogId);
+          {[...filtered].sort((a, b) => b.date.localeCompare(a.date)).map(r => {
+            const dog = dogs.find(d => d.id === r.dog_id);
             const t = TYPES.find(x => x.value === r.type);
             const Icon = t?.Icon || ClipboardList;
             return (

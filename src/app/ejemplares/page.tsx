@@ -103,7 +103,7 @@ export default async function EjemplaresPage({
         )}
         {totalCount > list.length && (
           <div className="pt-2 text-center">
-            <LinkButton variant="outline" href={`?${loadMoreParams.toString()}`}>
+            <LinkButton variant="outline" href={`?${loadMoreParams.toString()}`} scroll={false}>
               Cargar más ({totalCount - list.length} restantes)
             </LinkButton>
           </div>

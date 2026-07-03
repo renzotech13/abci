@@ -23,8 +23,8 @@ export function Button({
 }
 
 export function LinkButton({
-  children, href, variant = "primary", size = "md", className, ...props
-}: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; variant?: "primary" | "secondary" | "ghost" | "outline" | "accent"; size?: "sm" | "md" | "lg" }) {
+  children, href, variant = "primary", size = "md", className, scroll, ...props
+}: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; variant?: "primary" | "secondary" | "ghost" | "outline" | "accent"; size?: "sm" | "md" | "lg"; scroll?: boolean }) {
   const base = "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-all duration-200 ease-out active:scale-[0.97] whitespace-nowrap cursor-pointer";
   const sizes = { sm: "h-9 px-4 text-sm", md: "h-11 px-5 text-sm", lg: "h-12 px-6 text-base" };
   const variants = {
@@ -34,7 +34,7 @@ export function LinkButton({
     outline: "border border-border bg-transparent text-foreground hover:bg-muted hover:border-foreground/30",
     accent: "bg-amber-500 text-black hover:bg-amber-400 shadow-[0_2px_12px_rgba(232,185,35,0.25)] hover:shadow-[0_4px_20px_rgba(232,185,35,0.4)] hover:-translate-y-0.5",
   };
-  return <Link href={href} className={cn(base, sizes[size], variants[variant], className)} {...props}>{children}</Link>;
+  return <Link href={href} scroll={scroll} className={cn(base, sizes[size], variants[variant], className)} {...props}>{children}</Link>;
 }
 
 export function Card({ children, className, hoverable }: { children: ReactNode; className?: string; hoverable?: boolean }) {

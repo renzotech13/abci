@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BLOG_POSTS } from "@/lib/blog";
+import { createClient } from "@/lib/supabase/server";
 import { Card, Badge, SectionHeading } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { ScrollText, Tag, Dna, Palette, ArrowLeftRight, Trophy, type LucideIcon } from "lucide-react";
@@ -13,8 +13,8 @@ const COVER_ICON: Record<string, LucideIcon> = {
   "🏆": Trophy,
 };
 
-function CoverArt({ cover, large }: { cover: string; large?: boolean }) {
-  const Icon = COVER_ICON[cover] || ScrollText;
+function CoverArt({ cover, large }: { cover: string | null; large?: boolean }) {
+  const Icon = (cover && COVER_ICON[cover]) || ScrollText;
   return (
     <div className={`rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-zinc-900/30 aspect-video flex items-center justify-center ${large ? "" : "mb-4"}`}>
       <Icon className={`text-amber-500 ${large ? "w-24 h-24" : "w-14 h-14"}`} strokeWidth={1.25} />
@@ -22,9 +22,22 @@ function CoverArt({ cover, large }: { cover: string; large?: boolean }) {
   );
 }
 
-export default function BlogPage() {
-  const featured = BLOG_POSTS[0];
-  const rest = BLOG_POSTS.slice(1);
+export default async function BlogPage() {
+  const supabase = await createClient();
+  const { data: posts } = await supabase.from("blog_posts").select("*").order("date", { ascending: false });
+  const all = posts ?? [];
+  const featured = all[0];
+  const rest = all.slice(1);
+
+  if (!featured) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <SectionHeading eyebrow="Blog" title="Sabiduría genética, criadores e historias" description="Artículos por veterinarios, jueces y criaderos top de Latinoamérica." />
+        <p className="mt-10 text-muted-foreground">Aún no hay artículos publicados.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <SectionHeading eyebrow="Blog" title="Sabiduría genética, criadores e historias" description="Artículos por veterinarios, jueces y criaderos top de Latinoamérica." />
@@ -36,7 +49,7 @@ export default function BlogPage() {
             <Badge variant="accent" className="mb-3">Destacado</Badge>
             <h2 className="text-2xl font-bold leading-tight">{featured.title}</h2>
             <p className="mt-3 text-muted-foreground">{featured.excerpt}</p>
-            <p className="mt-4 text-xs text-muted-foreground">Por {featured.author} · {formatDate(featured.date)} · {featured.readTime} min de lectura</p>
+            <p className="mt-4 text-xs text-muted-foreground">Por {featured.author} · {formatDate(featured.date)} · {featured.read_time} min de lectura</p>
           </div>
         </Card>
       </Link>
@@ -51,7 +64,7 @@ export default function BlogPage() {
               </div>
               <h3 className="font-semibold leading-snug">{p.title}</h3>
               <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{p.excerpt}</p>
-              <p className="mt-4 text-xs text-muted-foreground">{formatDate(p.date)} · {p.readTime} min</p>
+              <p className="mt-4 text-xs text-muted-foreground">{formatDate(p.date)} · {p.read_time} min</p>
             </Card>
           </Link>
         ))}

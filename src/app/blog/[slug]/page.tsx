@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BLOG_POSTS } from "@/lib/blog";
+import { createClient } from "@/lib/supabase/server";
 import { Badge, LinkButton } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeft, ScrollText, Tag, Dna, Palette, ArrowLeftRight, Trophy, type LucideIcon } from "lucide-react";
@@ -14,17 +14,15 @@ const COVER_ICON: Record<string, LucideIcon> = {
   "🏆": Trophy,
 };
 
-export function generateStaticParams() {
-  return BLOG_POSTS.map(p => ({ slug: p.slug }));
-}
-
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = BLOG_POSTS.find(p => p.slug === slug);
+  const supabase = await createClient();
+
+  const { data: post } = await supabase.from("blog_posts").select("*").eq("slug", slug).maybeSingle();
   if (!post) notFound();
 
-  const related = BLOG_POSTS.filter(p => p.slug !== slug).slice(0, 3);
-  const CoverIcon = COVER_ICON[post.cover] || ScrollText;
+  const { data: related } = await supabase.from("blog_posts").select("*").neq("slug", slug).limit(3);
+  const CoverIcon = (post.cover && COVER_ICON[post.cover]) || ScrollText;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
@@ -41,7 +39,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-black flex items-center justify-center font-bold">{post.author.charAt(0)}</div>
         <div>
           <p className="font-medium text-foreground">{post.author}</p>
-          <p className="text-xs">{formatDate(post.date)} · {post.readTime} min de lectura</p>
+          <p className="text-xs">{formatDate(post.date)} · {post.read_time} min de lectura</p>
         </div>
       </div>
 
@@ -71,21 +69,23 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         <LinkButton href="/registrarse" variant="accent" className="mt-4">Crear cuenta de criadero</LinkButton>
       </div>
 
-      <div className="mt-12">
-        <h3 className="text-xl font-bold mb-5">Lecturas relacionadas</h3>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {related.map(r => {
-            const Icon = COVER_ICON[r.cover] || ScrollText;
-            return (
-              <Link key={r.id} href={`/blog/${r.slug}`} className="block p-4 rounded-2xl border border-border hover:border-amber-500/40 transition">
-                <Icon className="w-7 h-7 text-amber-500" strokeWidth={1.5} />
-                <p className="font-semibold mt-2 text-sm leading-snug">{r.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{r.readTime} min</p>
-              </Link>
-            );
-          })}
+      {related && related.length > 0 && (
+        <div className="mt-12">
+          <h3 className="text-xl font-bold mb-5">Lecturas relacionadas</h3>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {related.map(r => {
+              const Icon = (r.cover && COVER_ICON[r.cover]) || ScrollText;
+              return (
+                <Link key={r.id} href={`/blog/${r.slug}`} className="block p-4 rounded-2xl border border-border hover:border-amber-500/40 transition">
+                  <Icon className="w-7 h-7 text-amber-500" strokeWidth={1.5} />
+                  <p className="font-semibold mt-2 text-sm leading-snug">{r.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{r.read_time} min</p>
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </article>
   );
 }

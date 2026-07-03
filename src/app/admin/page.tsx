@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/AdminLayout";
-import {
-  getDogs, getUsers, getAffixes, getTransfers, getEvents,
-  getMarketplace, getAdminLogs, getCurrentUser,
-} from "@/lib/store";
-import type { Dog, User, Transfer, AdminLog } from "@/lib/types";
-import { Card, Badge, LinkButton } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
+import { Card, LinkButton } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import {
   Dog as DogIcon, Users, FileText, Tag, ArrowLeftRight,
@@ -16,43 +13,62 @@ import {
   Upload, Activity,
 } from "lucide-react";
 
+type Dog = Tables<"dogs">;
+type AdminLog = Tables<"admin_logs">;
+
 export default function AdminDashboardPage() {
-  const [dogs, setDogs] = useState<Dog[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [affixes, setAffixes] = useState(0);
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [events, setEvents] = useState(0);
-  const [listings, setListings] = useState(0);
+  const [dogCount, setDogCount] = useState(0);
+  const [last30Days, setLast30Days] = useState(0);
+  const [recentDogs, setRecentDogs] = useState<Dog[]>([]);
+  const [userCount, setUserCount] = useState(0);
+  const [elite, setElite] = useState(0);
+  const [pro, setPro] = useState(0);
+  const [affixCount, setAffixCount] = useState(0);
+  const [pendingTransfers, setPendingTransfers] = useState(0);
+  const [transferCount, setTransferCount] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
+  const [listingCount, setListingCount] = useState(0);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [adminName, setAdminName] = useState("");
 
   useEffect(() => {
-    setDogs(getDogs());
-    setUsers(getUsers());
-    setAffixes(getAffixes().length);
-    setTransfers(getTransfers());
-    setEvents(getEvents().length);
-    setListings(getMarketplace().length);
-    setLogs(getAdminLogs().slice(0, 6));
-    const cur = getCurrentUser();
-    if (cur) setAdminName(cur.name.split(" ")[0]);
+    const supabase = createClient();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await supabase.from("profiles").select("name").eq("id", data.user.id).maybeSingle();
+      if (profile) setAdminName(profile.name.split(" ")[0]);
+    });
+
+    supabase.from("dogs").select("*", { count: "exact", head: true }).then(({ count }) => setDogCount(count ?? 0));
+    supabase.from("dogs").select("*", { count: "exact", head: true }).gte("registration_date", thirtyDaysAgo).then(({ count }) => setLast30Days(count ?? 0));
+    supabase.from("dogs").select("*").order("registration_date", { ascending: false }).limit(5).then(({ data: rows }) => setRecentDogs(rows ?? []));
+
+    supabase.from("profiles").select("*", { count: "exact", head: true }).then(({ count }) => setUserCount(count ?? 0));
+    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("membership", "elite").then(({ count }) => setElite(count ?? 0));
+    supabase.from("profiles").select("*", { count: "exact", head: true }).eq("membership", "pro").then(({ count }) => setPro(count ?? 0));
+
+    supabase.from("affixes").select("*", { count: "exact", head: true }).then(({ count }) => setAffixCount(count ?? 0));
+
+    supabase.from("transfers").select("*", { count: "exact", head: true }).then(({ count }) => setTransferCount(count ?? 0));
+    supabase.from("transfers").select("*", { count: "exact", head: true }).eq("status", "pending").then(({ count }) => setPendingTransfers(count ?? 0));
+
+    supabase.from("events").select("*", { count: "exact", head: true }).then(({ count }) => setEventCount(count ?? 0));
+    supabase.from("marketplace_listings").select("*", { count: "exact", head: true }).then(({ count }) => setListingCount(count ?? 0));
+
+    supabase.from("admin_logs").select("*").order("timestamp", { ascending: false }).limit(6).then(({ data: rows }) => setLogs(rows ?? []));
   }, []);
 
-  const pendingTransfers = transfers.filter(t => t.status === "pending").length;
-  const elite = users.filter(u => u.membership === "elite").length;
-  const pro = users.filter(u => u.membership === "pro").length;
-  const recentDogs = [...dogs].sort((a, b) => b.registrationDate.localeCompare(a.registrationDate)).slice(0, 5);
-  const last30Days = dogs.filter(d => Date.now() - new Date(d.registrationDate).getTime() < 30 * 86400 * 1000).length;
-
   const stats = [
-    { label: "Ejemplares totales", value: dogs.length, sub: `+${last30Days} este mes`, Icon: DogIcon, href: "/admin/dogs" },
-    { label: "Usuarios registrados", value: users.length, sub: `${elite} elite · ${pro} pro`, Icon: Users, href: "/admin/users" },
-    { label: "Certificados emitidos", value: dogs.length, sub: "100% verificados", Icon: FileText, href: "/admin/certificates" },
-    { label: "Afijos registrados", value: affixes, sub: "Activos", Icon: Tag, href: "/admin/affixes" },
-    { label: "Traspasos pendientes", value: pendingTransfers, sub: `${transfers.length} totales`, Icon: ArrowLeftRight, href: "/admin/transfers", alert: pendingTransfers > 0 },
-    { label: "Eventos programados", value: events, sub: "Próximos", Icon: CalendarDays, href: "/admin/events" },
-    { label: "Anuncios en mercado", value: listings, sub: "Activos", Icon: ShoppingBag, href: "/admin/marketplace" },
-    { label: "Crecimiento mensual", value: `${Math.round((last30Days / Math.max(dogs.length, 1)) * 100)}%`, sub: "Ejemplares nuevos", Icon: TrendingUp },
+    { label: "Ejemplares totales", value: dogCount, sub: `+${last30Days} este mes`, Icon: DogIcon, href: "/admin/dogs" },
+    { label: "Usuarios registrados", value: userCount, sub: `${elite} elite · ${pro} pro`, Icon: Users, href: "/admin/users" },
+    { label: "Certificados emitidos", value: dogCount, sub: "100% verificados", Icon: FileText, href: "/admin/certificates" },
+    { label: "Afijos registrados", value: affixCount, sub: "Activos", Icon: Tag, href: "/admin/affixes" },
+    { label: "Traspasos pendientes", value: pendingTransfers, sub: `${transferCount} totales`, Icon: ArrowLeftRight, href: "/admin/transfers", alert: pendingTransfers > 0 },
+    { label: "Eventos programados", value: eventCount, sub: "Próximos", Icon: CalendarDays, href: "/admin/events" },
+    { label: "Anuncios en mercado", value: listingCount, sub: "Activos", Icon: ShoppingBag, href: "/admin/marketplace" },
+    { label: "Crecimiento mensual", value: `${Math.round((last30Days / Math.max(dogCount, 1)) * 100)}%`, sub: "Ejemplares nuevos", Icon: TrendingUp },
   ];
 
   return (
@@ -117,11 +133,11 @@ export default function AdminDashboardPage() {
                   <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition">
                     <td className="px-4 py-3">
                       <Link href={`/ejemplar/${d.id}`} className="font-medium hover:text-amber-500">{d.name}</Link>
-                      <p className="text-xs text-muted-foreground sm:hidden">Nro. {d.certificateId}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden">Nro. {d.certificate_id}</p>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs hidden sm:table-cell">{d.certificateId}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{d.kennelName || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatShortDate(d.registrationDate)}</td>
+                    <td className="px-4 py-3 font-mono text-xs hidden sm:table-cell">{d.certificate_id}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{d.kennel_name || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatShortDate(d.registration_date)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -152,7 +168,7 @@ export default function AdminDashboardPage() {
                 {logs.map(l => (
                   <li key={l.id} className="text-xs">
                     <p className="font-medium">{l.action}</p>
-                    <p className="text-muted-foreground mt-0.5">{l.adminName} · {formatShortDate(l.timestamp)}</p>
+                    <p className="text-muted-foreground mt-0.5">{l.admin_name} · {formatShortDate(l.timestamp)}</p>
                   </li>
                 ))}
               </ul>

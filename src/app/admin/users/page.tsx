@@ -2,57 +2,72 @@
 
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getUsers, getDogs, adminUpdateUser, adminDeleteUser, logAdminAction } from "@/lib/store";
-import type { User, Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Input, Select } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import {
   Users, Search, ShieldCheck, Star, Trash2, Edit3, X, Save,
 } from "lucide-react";
 
+type Profile = Tables<"profiles">;
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [dogs, setDogs] = useState<Dog[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [dogCounts, setDogCounts] = useState<Record<string, number>>({});
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState<"all" | "free" | "pro" | "elite">("all");
-  const [editing, setEditing] = useState<User | null>(null);
+  const [editing, setEditing] = useState<Profile | null>(null);
+
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    const list = data ?? [];
+    setUsers(list);
+    const counts: Record<string, number> = {};
+    await Promise.all(list.map(async u => {
+      const { count } = await supabase.from("dogs").select("*", { count: "exact", head: true }).eq("owner_id", u.id);
+      counts[u.id] = count ?? 0;
+    }));
+    setDogCounts(counts);
+  }
 
   useEffect(() => { refresh(); }, []);
-
-  function refresh() {
-    setUsers(getUsers());
-    setDogs(getDogs());
-  }
 
   const filtered = users.filter(u => {
     if (tier !== "all" && u.membership !== tier) return false;
     if (query) {
       const q = query.toLowerCase();
-      if (!`${u.name} ${u.email} ${u.kennelName} ${u.country}`.toLowerCase().includes(q)) return false;
+      if (!`${u.name} ${u.email} ${u.kennel_name} ${u.country}`.toLowerCase().includes(q)) return false;
     }
     return true;
   });
 
-  function handleDelete(u: User) {
+  async function handleDelete(u: Profile) {
     if (u.role === "admin") {
       alert("No se puede eliminar una cuenta de administrador.");
       return;
     }
-    if (!confirm(`¿Eliminar a ${u.name} permanentemente?`)) return;
-    adminDeleteUser(u.id);
-    logAdminAction("Usuario eliminado", u.name, u.email);
+    if (!confirm(`¿Quitar a ${u.name} del registro? Esto elimina su perfil de criador; la cuenta de acceso debe darse de baja por separado.`)) return;
+    const supabase = createClient();
+    await supabase.from("profiles").delete().eq("id", u.id);
+    await logAdminAction(supabase, "Usuario eliminado", u.name, u.email);
     refresh();
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editing) return;
-    adminUpdateUser(editing.id, editing);
-    logAdminAction("Usuario actualizado", editing.name);
+    const supabase = createClient();
+    const patch: TablesUpdate<"profiles"> = {
+      name: editing.name, kennel_name: editing.kennel_name,
+      membership: editing.membership, role: editing.role,
+    };
+    await supabase.from("profiles").update(patch).eq("id", editing.id);
+    await logAdminAction(supabase, "Usuario actualizado", editing.name);
     setEditing(null);
     refresh();
   }
-
-  function dogCount(uid: string) { return dogs.filter(d => d.ownerId === uid).length; }
 
   return (
     <AdminLayout>
@@ -115,7 +130,7 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs hidden md:table-cell">
-                    <p>{u.kennelName || "—"}</p>
+                    <p>{u.kennel_name || "—"}</p>
                     <p className="text-muted-foreground">{u.country || "—"}</p>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
@@ -125,8 +140,8 @@ export default function AdminUsersPage() {
                       {u.membership.toUpperCase()}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-xs hidden lg:table-cell">{dogCount(u.id)}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatShortDate(u.createdAt)}</td>
+                  <td className="px-4 py-3 text-xs hidden lg:table-cell">{dogCounts[u.id] ?? 0}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatShortDate(u.created_at)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
                       <button onClick={() => setEditing(u)} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Editar">
@@ -162,11 +177,11 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">Criadero</label>
-                  <Input value={editing.kennelName || ""} onChange={e => setEditing({ ...editing, kennelName: e.target.value })} />
+                  <Input value={editing.kennel_name || ""} onChange={e => setEditing({ ...editing, kennel_name: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">Plan de membresía</label>
-                  <Select value={editing.membership} onChange={e => setEditing({ ...editing, membership: e.target.value as User["membership"] })}>
+                  <Select value={editing.membership} onChange={e => setEditing({ ...editing, membership: e.target.value })}>
                     <option value="free">Gratuito</option>
                     <option value="pro">Pro</option>
                     <option value="elite">Elite</option>
@@ -174,7 +189,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">Rol</label>
-                  <Select value={editing.role || "user"} onChange={e => setEditing({ ...editing, role: e.target.value as User["role"] })}>
+                  <Select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value })}>
                     <option value="user">Usuario</option>
                     <option value="admin">Administrador</option>
                   </Select>

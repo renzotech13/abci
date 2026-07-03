@@ -3,35 +3,59 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getDogs, getUsers } from "@/lib/store";
-import type { Dog, User } from "@/lib/types";
-import { Card, Badge, Input } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
+import { Card, Badge, Input, Button } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
-import { FileText, Search, ShieldCheck, Eye, Printer } from "lucide-react";
+import { FileText, Search, ShieldCheck, Eye, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+
+type Dog = Tables<"dogs">;
+const PAGE_SIZE = 20;
+
+function escapeForOrFilter(v: string) {
+  return v.replace(/\\/g, "\\\\").replace(/[%_,()]/g, c => `\\${c}`);
+}
 
 export default function AdminCertificatesPage() {
   const [dogs, setDogs] = useState<Dog[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [owners, setOwners] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [totalIssued, setTotalIssued] = useState(0);
+  const [last7, setLast7] = useState(0);
+  const [last30, setLast30] = useState(0);
 
   useEffect(() => {
-    setDogs(getDogs());
-    setUsers(getUsers());
+    const supabase = createClient();
+    const now = Date.now();
+    supabase.from("dogs").select("*", { count: "exact", head: true }).then(({ count }) => setTotalIssued(count ?? 0));
+    supabase.from("dogs").select("*", { count: "exact", head: true }).gte("registration_date", new Date(now - 7 * 86400 * 1000).toISOString()).then(({ count }) => setLast7(count ?? 0));
+    supabase.from("dogs").select("*", { count: "exact", head: true }).gte("registration_date", new Date(now - 30 * 86400 * 1000).toISOString()).then(({ count }) => setLast30(count ?? 0));
   }, []);
 
-  const filtered = dogs.filter(d => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return `${d.certificateId} ${d.name} ${d.kennelName}`.toLowerCase().includes(q);
-  });
+  useEffect(() => {
+    const supabase = createClient();
+    let q = supabase.from("dogs").select("*", { count: "exact" }).order("registration_date", { ascending: false });
+    if (query) {
+      const esc = escapeForOrFilter(query);
+      q = q.or(`certificate_id.ilike.%${esc}%,name.ilike.%${esc}%,kennel_name.ilike.%${esc}%`);
+    }
+    q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1).then(async ({ data, count }) => {
+      const rows = data ?? [];
+      setDogs(rows);
+      setFilteredCount(count ?? 0);
+      const ownerIds = Array.from(new Set(rows.map(d => d.owner_id).filter((id): id is string => !!id)));
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", ownerIds);
+        setOwners(Object.fromEntries((profiles ?? []).map(p => [p.id, p.name])));
+      } else {
+        setOwners({});
+      }
+    });
+  }, [query, page]);
 
-  function ownerName(id: string) {
-    return users.find(u => u.id === id)?.name || "—";
-  }
-
-  const totalIssued = dogs.length;
-  const last7 = dogs.filter(d => Date.now() - new Date(d.registrationDate).getTime() < 7 * 86400 * 1000).length;
-  const last30 = dogs.filter(d => Date.now() - new Date(d.registrationDate).getTime() < 30 * 86400 * 1000).length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
 
   return (
     <AdminLayout>
@@ -59,7 +83,7 @@ export default function AdminCertificatesPage() {
       <Card className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por número de registro, nombre del ejemplar o criadero..." className="pl-9 font-mono" />
+          <Input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder="Buscar por número de registro, nombre del ejemplar o criadero..." className="pl-9 font-mono" />
         </div>
       </Card>
 
@@ -77,24 +101,24 @@ export default function AdminCertificatesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(d => (
+              {dogs.map(d => (
                 <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition">
-                  <td className="px-4 py-3 font-mono font-bold text-amber-500">{d.certificateId}</td>
+                  <td className="px-4 py-3 font-mono font-bold text-amber-500">{d.certificate_id}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium">{d.name}</p>
                     <p className="text-xs text-muted-foreground">{d.breed}{d.variant ? ` · ${d.variant}` : ""}</p>
                   </td>
-                  <td className="px-4 py-3 text-xs hidden md:table-cell">{ownerName(d.ownerId)}</td>
+                  <td className="px-4 py-3 text-xs hidden md:table-cell">{d.owner_id ? (owners[d.owner_id] || "—") : "Sin reclamar"}</td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <Badge variant="success"><ShieldCheck className="w-2.5 h-2.5" /> Verificado</Badge>
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatShortDate(d.registrationDate)}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatShortDate(d.registration_date)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
-                      <Link href={`/certificado/${d.certificateId}`} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Ver">
+                      <Link href={`/certificado/${d.certificate_id}`} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Ver">
                         <Eye className="w-4 h-4" />
                       </Link>
-                      <Link href={`/certificado/${d.certificateId}`} target="_blank" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Imprimir">
+                      <Link href={`/certificado/${d.certificate_id}`} target="_blank" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Imprimir">
                         <Printer className="w-4 h-4" />
                       </Link>
                     </div>
@@ -104,6 +128,19 @@ export default function AdminCertificatesPage() {
             </tbody>
           </table>
         </div>
+        {filteredCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between p-4 border-t border-border">
+            <p className="text-xs text-muted-foreground">Página {page} de {totalPages}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </Button>
+              <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+                Siguiente <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </AdminLayout>
   );

@@ -3,8 +3,9 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { AdminLayout } from "@/components/AdminLayout";
-import { adminBulkAddDogs } from "@/lib/store";
-import type { Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 import { Card, Button, Badge, LinkButton, Label, Select } from "@/components/ui";
 import {
   Upload, FileSpreadsheet, Trash2, ArrowRight, CheckCircle2, RefreshCw,
@@ -13,7 +14,14 @@ import {
 
 type SheetRow = Record<string, string | number | undefined>;
 
-const FIELDS: { key: keyof Dog; label: string; required?: boolean; example: string }[] = [
+type MappedDog = {
+  name?: string; callName?: string; breed?: string; variant?: string;
+  gender?: "male" | "female"; color?: string; dob?: string; weight?: number; height?: number;
+  microchip?: string; sireName?: string; damName?: string; kennelName?: string;
+  breederName?: string; location?: string; certificateId?: string; photo?: string;
+};
+
+const FIELDS: { key: keyof MappedDog; label: string; required?: boolean; example: string }[] = [
   { key: "name", label: "Nombre de registro", required: true, example: "FIGHTING BULL MILI" },
   { key: "callName", label: "Nombre de llamada", example: "Mili" },
   { key: "breed", label: "Raza", example: "American Bully" },
@@ -30,7 +38,7 @@ const FIELDS: { key: keyof Dog; label: string; required?: boolean; example: stri
   { key: "breederName", label: "Criador", example: "Anthony Huamán" },
   { key: "location", label: "Ubicación", example: "Lima, Perú" },
   { key: "certificateId", label: "Nro. de registro (opcional)", example: "29601" },
-  { key: "photo", label: "Foto URL", example: "https://abciregistro.com/wp-content/uploads/2024/03/foto.jpg" },
+  { key: "photo", label: "Foto URL", example: "https://ejemplo.com/foto.jpg" },
 ];
 
 function normalizeKey(key: string): string {
@@ -40,8 +48,7 @@ function normalizeKey(key: string): string {
 function autoMap(headers: string[]): Record<string, string> {
   const map: Record<string, string> = {};
   const norms = headers.map(h => ({ raw: h, norm: normalizeKey(h) }));
-  // Listadas de más específicas a más genéricas — la primera que matchee gana
-  const guesses: Record<keyof Dog, string[]> = {
+  const guesses: Record<keyof MappedDog, string[]> = {
     name: ["nombre de registro", "nombre completo", "nombre del ejemplar", "nombre", "name"],
     callName: ["nombre de llamada", "call name", "llamada", "apodo"],
     breed: ["raza", "breed"],
@@ -59,11 +66,10 @@ function autoMap(headers: string[]): Record<string, string> {
     location: ["ubicacion", "ubicación", "location", "lugar", "ciudad"],
     certificateId: ["nro. de registro", "nro de registro", "numero de registro", "número de registro", "n° de registro", "id de registro", "registro id", "certificate id", "certificate", "certificado", "registro abci"],
     photo: ["foto url", "foto", "photo", "imagen", "image", "foto del ejemplar", "url foto", "url imagen", "photo url"],
-  } as Record<keyof Dog, string[]>;
+  };
 
   for (const f of FIELDS) {
     const candidates = guesses[f.key] || [];
-    // Coincidencia parcial: el header normalizado contiene cualquiera de los candidatos
     let match = norms.find(h => candidates.some(c => h.norm === c));
     if (!match) match = norms.find(h => candidates.some(c => h.norm.startsWith(c)));
     if (!match) match = norms.find(h => candidates.some(c => h.norm.includes(c)));
@@ -120,10 +126,12 @@ export default function ImportPage() {
     XLSX.writeFile(wb, "plantilla-abci-ejemplares.xlsx");
   }
 
-  function performImport() {
+  async function performImport() {
     setImporting(true);
-    const mapped: Partial<Dog>[] = rows.map(row => {
-      const obj: Partial<Dog> = {};
+    const supabase = createClient();
+
+    const mapped: MappedDog[] = rows.map(row => {
+      const obj: MappedDog = {};
       for (const f of FIELDS) {
         const sourceCol = mapping[f.key];
         if (!sourceCol) continue;
@@ -137,15 +145,72 @@ export default function ImportPage() {
         } else {
           (obj as Record<string, unknown>)[f.key] = String(v);
         }
-        // photo: solo asignar si es una URL válida
         if (f.key === "photo" && obj.photo && !String(obj.photo).startsWith("http")) {
           delete obj.photo;
         }
       }
       return obj;
     });
-    const r = adminBulkAddDogs(mapped);
-    setResult(r);
+
+    let skipped = 0;
+    const errors: string[] = [];
+    const valid: MappedDog[] = [];
+    for (const row of mapped) {
+      if (!row.name) { skipped++; errors.push("Fila sin nombre"); continue; }
+      if (!row.dob) { skipped++; errors.push(`${row.name}: falta fecha de nacimiento`); continue; }
+      valid.push(row);
+    }
+
+    const finalRows: TablesInsert<"dogs">[] = [];
+    for (const row of valid) {
+      let certId = row.certificateId;
+      if (!certId) {
+        const { data } = await supabase.rpc("generate_certificate_id");
+        certId = data as string;
+      }
+      finalRows.push({
+        certificate_id: certId,
+        owner_id: null,
+        name: row.name!.toUpperCase(),
+        call_name: row.callName || null,
+        breed: row.breed || "American Bully",
+        variant: row.variant || null,
+        gender: row.gender || "male",
+        color: row.color || null,
+        weight: row.weight ?? null,
+        height: row.height ?? null,
+        dob: row.dob || null,
+        microchip: row.microchip || null,
+        sire_name: row.sireName || null,
+        dam_name: row.damName || null,
+        kennel_name: row.kennelName || null,
+        breeder_name: row.breederName || null,
+        location: row.location || null,
+        photo_url: row.photo || null,
+        source: "app",
+      });
+    }
+
+    const certIds = finalRows.map(r => r.certificate_id);
+    const existingSet = new Set<string>();
+    for (let i = 0; i < certIds.length; i += 500) {
+      const { data: existing } = await supabase.from("dogs").select("certificate_id").in("certificate_id", certIds.slice(i, i + 500));
+      (existing ?? []).forEach(d => existingSet.add(d.certificate_id));
+    }
+
+    let hardErrors = 0;
+    for (let i = 0; i < finalRows.length; i += 500) {
+      const batch = finalRows.slice(i, i + 500);
+      const { error } = await supabase.from("dogs").upsert(batch, { onConflict: "certificate_id" });
+      if (error) { hardErrors += batch.length; errors.push(`Lote ${i}-${i + batch.length}: ${error.message}`); }
+    }
+
+    const added = finalRows.filter(r => !existingSet.has(r.certificate_id)).length;
+    const updated = finalRows.length - added - hardErrors;
+
+    await logAdminAction(supabase, "Importación masiva de ejemplares", undefined, `${added} agregados · ${updated} actualizados · ${skipped} omitidos`);
+
+    setResult({ added, updated, skipped, errors });
     setStep("done");
     setImporting(false);
   }

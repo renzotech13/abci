@@ -2,38 +2,58 @@
 
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getTransfers, updateTransfer, getDogs, getUsers, logAdminAction } from "@/lib/store";
-import type { Transfer, Dog, User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { approveTransfer } from "@/lib/transfers";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Select } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import {
   ArrowLeftRight, Clock, CheckCircle2, XCircle, Filter,
 } from "lucide-react";
 
+type Transfer = Tables<"transfers">;
+type Dog = Tables<"dogs">;
+type Profile = Tables<"profiles">;
+
 export default function AdminTransfersPage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [dogs, setDogs] = useState<Dog[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [dogs, setDogs] = useState<Record<string, Dog>>({});
+  const [users, setUsers] = useState<Record<string, Profile>>({});
   const [status, setStatus] = useState<"all" | "pending" | "approved" | "rejected">("all");
+
+  async function refresh() {
+    const supabase = createClient();
+    const { data: allTransfers } = await supabase.from("transfers").select("*").order("requested_at", { ascending: false });
+    const list = allTransfers ?? [];
+    setTransfers(list);
+
+    const dogIds = Array.from(new Set(list.map(t => t.dog_id)));
+    const userIds = Array.from(new Set(list.map(t => t.from_user_id)));
+    if (dogIds.length > 0) {
+      const { data } = await supabase.from("dogs").select("*").in("id", dogIds);
+      setDogs(Object.fromEntries((data ?? []).map(d => [d.id, d])));
+    }
+    if (userIds.length > 0) {
+      const { data } = await supabase.from("profiles").select("*").in("id", userIds);
+      setUsers(Object.fromEntries((data ?? []).map(u => [u.id, u])));
+    }
+  }
 
   useEffect(() => { refresh(); }, []);
 
-  function refresh() {
-    setTransfers(getTransfers());
-    setDogs(getDogs());
-    setUsers(getUsers());
-  }
-
-  function approve(t: Transfer) {
-    updateTransfer(t.id, { status: "approved", completedAt: new Date().toISOString() });
-    logAdminAction("Traspaso aprobado", `Nro. ${dogs.find(d => d.id === t.dogId)?.certificateId}`, `Hacia ${t.toEmail}`);
+  async function approve(t: Transfer) {
+    const supabase = createClient();
+    await approveTransfer(supabase, t);
+    await logAdminAction(supabase, "Traspaso aprobado", `Nro. ${dogs[t.dog_id]?.certificate_id}`, `Hacia ${t.to_email}`);
     refresh();
   }
 
-  function reject(t: Transfer) {
+  async function reject(t: Transfer) {
     if (!confirm("¿Rechazar este traspaso?")) return;
-    updateTransfer(t.id, { status: "rejected" });
-    logAdminAction("Traspaso rechazado", `Nro. ${dogs.find(d => d.id === t.dogId)?.certificateId}`);
+    const supabase = createClient();
+    await supabase.from("transfers").update({ status: "rejected" }).eq("id", t.id);
+    await logAdminAction(supabase, "Traspaso rechazado", `Nro. ${dogs[t.dog_id]?.certificate_id}`);
     refresh();
   }
 
@@ -79,15 +99,15 @@ export default function AdminTransfersPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map(t => {
-            const dog = dogs.find(d => d.id === t.dogId);
-            const fromUser = users.find(u => u.id === t.fromUserId);
+            const dog = dogs[t.dog_id];
+            const fromUser = users[t.from_user_id];
             return (
               <Card key={t.id}>
                 <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{dog?.name || "Ejemplar"}</p>
-                      <Badge>Nro. {dog?.certificateId}</Badge>
+                      <Badge>Nro. {dog?.certificate_id}</Badge>
                       <Badge variant={t.status === "approved" ? "success" : t.status === "rejected" ? "default" : "warning"}>
                         {t.status === "pending" ? <><Clock className="w-3 h-3" /> Pendiente</> : t.status === "approved" ? <><CheckCircle2 className="w-3 h-3" /> Aprobado</> : <><XCircle className="w-3 h-3" /> Rechazado</>}
                       </Badge>
@@ -95,15 +115,15 @@ export default function AdminTransfersPage() {
                     <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">De</p>
-                        <p className="font-medium">{fromUser?.name || t.fromUserId}</p>
+                        <p className="font-medium">{fromUser?.name || t.from_user_id}</p>
                         <p className="text-xs text-muted-foreground">{fromUser?.email}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Hacia</p>
-                        <p className="font-medium">{t.toEmail}</p>
+                        <p className="font-medium">{t.to_email}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-3">Solicitado el {formatShortDate(t.requestedAt)}{t.completedAt ? ` · Completado el ${formatShortDate(t.completedAt)}` : ""}</p>
+                    <p className="text-xs text-muted-foreground mt-3">Solicitado el {formatShortDate(t.requested_at)}{t.completed_at ? ` · Completado el ${formatShortDate(t.completed_at)}` : ""}</p>
                     {t.notes && <p className="text-sm text-muted-foreground mt-2 italic">&quot;{t.notes}&quot;</p>}
                   </div>
                   {t.status === "pending" && (

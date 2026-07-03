@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getDogs, saveDogs, logAdminAction } from "@/lib/store";
-import type { Dog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Input, Select } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import {
@@ -13,35 +14,51 @@ import {
   ChevronLeft, ChevronRight, Filter, X,
 } from "lucide-react";
 
+type Dog = Tables<"dogs">;
 const PAGE_SIZE = 12;
+
+function escapeForOrFilter(v: string) {
+  return v.replace(/\\/g, "\\\\").replace(/[%_,()]/g, c => `\\${c}`);
+}
 
 export default function AdminDogsPage() {
   const [dogs, setDogs] = useState<Dog[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [breeds, setBreeds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
   const [breed, setBreed] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  useEffect(() => { setDogs(getDogs()); }, []);
+  async function refresh() {
+    const supabase = createClient();
 
-  function refresh() { setDogs(getDogs()); setSelected(new Set()); }
-
-  const breeds = Array.from(new Set(dogs.map(d => d.breed))).filter(Boolean);
-
-  const filtered = dogs.filter(d => {
-    if (gender !== "all" && d.gender !== gender) return false;
-    if (breed !== "all" && d.breed !== breed) return false;
+    let q = supabase.from("dogs").select("*", { count: "exact" }).order("registration_date", { ascending: false });
+    if (gender !== "all") q = q.eq("gender", gender);
+    if (breed !== "all") q = q.eq("breed", breed);
     if (query) {
-      const q = query.toLowerCase();
-      const hay = `${d.name} ${d.callName} ${d.kennelName} ${d.certificateId} ${d.color}`.toLowerCase();
-      if (!hay.includes(q)) return false;
+      const esc = escapeForOrFilter(query);
+      q = q.or(`name.ilike.%${esc}%,kennel_name.ilike.%${esc}%,certificate_id.ilike.%${esc}%,call_name.ilike.%${esc}%`);
     }
-    return true;
-  });
+    const { data, count } = await q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+    setDogs(data ?? []);
+    setFilteredCount(count ?? 0);
+    setSelected(new Set());
+  }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("dogs").select("*", { count: "exact", head: true }).then(({ count }) => setTotalCount(count ?? 0));
+    supabase.from("dogs").select("breed").then(({ data }) => {
+      setBreeds(Array.from(new Set((data ?? []).map(r => r.breed))).sort());
+    });
+  }, []);
+
+  useEffect(() => { refresh(); }, [page, gender, breed, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -49,38 +66,54 @@ export default function AdminDogsPage() {
     setSelected(next);
   }
   function toggleAllVisible() {
-    if (visible.every(d => selected.has(d.id))) {
+    if (dogs.every(d => selected.has(d.id))) {
       const next = new Set(selected);
-      visible.forEach(d => next.delete(d.id));
+      dogs.forEach(d => next.delete(d.id));
       setSelected(next);
     } else {
       const next = new Set(selected);
-      visible.forEach(d => next.add(d.id));
+      dogs.forEach(d => next.add(d.id));
       setSelected(next);
     }
   }
 
-  function handleDelete(id: string, name: string) {
+  async function handleDelete(id: string, name: string) {
     if (!confirm(`¿Eliminar ${name} del registro?`)) return;
-    saveDogs(getDogs().filter(d => d.id !== id));
-    logAdminAction("Ejemplar eliminado", name);
+    const supabase = createClient();
+    await supabase.from("dogs").delete().eq("id", id);
+    await logAdminAction(supabase, "Ejemplar eliminado", name);
     refresh();
   }
 
-  function bulkDelete() {
+  async function bulkDelete() {
     if (selected.size === 0) return;
     if (!confirm(`¿Eliminar ${selected.size} ejemplares del registro? Esta acción no se puede deshacer.`)) return;
-    saveDogs(getDogs().filter(d => !selected.has(d.id)));
-    logAdminAction("Eliminación masiva", undefined, `${selected.size} ejemplares`);
+    const supabase = createClient();
+    await supabase.from("dogs").delete().in("id", Array.from(selected));
+    await logAdminAction(supabase, "Eliminación masiva", undefined, `${selected.size} ejemplares`);
     refresh();
   }
 
-  function exportSelected() {
-    const list = selected.size > 0 ? dogs.filter(d => selected.has(d.id)) : filtered;
+  async function exportSelected() {
+    const supabase = createClient();
+    let list: Dog[];
+    if (selected.size > 0) {
+      list = dogs.filter(d => selected.has(d.id));
+    } else {
+      let q = supabase.from("dogs").select("*").order("registration_date", { ascending: false });
+      if (gender !== "all") q = q.eq("gender", gender);
+      if (breed !== "all") q = q.eq("breed", breed);
+      if (query) {
+        const esc = escapeForOrFilter(query);
+        q = q.or(`name.ilike.%${esc}%,kennel_name.ilike.%${esc}%,certificate_id.ilike.%${esc}%,call_name.ilike.%${esc}%`);
+      }
+      const { data } = await q;
+      list = data ?? [];
+    }
     const rows = list.map(d => ({
-      "Nro. de registro": d.certificateId,
+      "Nro. de registro": d.certificate_id,
       "Nombre": d.name,
-      "Llamada": d.callName || "",
+      "Llamada": d.call_name || "",
       "Raza": d.breed,
       "Variante": d.variant || "",
       "Sexo": d.gender === "male" ? "Macho" : "Hembra",
@@ -89,22 +122,22 @@ export default function AdminDogsPage() {
       "Altura (cm)": d.height || "",
       "Nacimiento": d.dob,
       "Microchip": d.microchip || "",
-      "Padre": d.sireName || "",
-      "Madre": d.damName || "",
-      "Criadero": d.kennelName || "",
-      "Criador": d.breederName || "",
+      "Padre": d.sire_name || "",
+      "Madre": d.dam_name || "",
+      "Criadero": d.kennel_name || "",
+      "Criador": d.breeder_name || "",
       "Ubicación": d.location || "",
       "Estado": d.status,
-      "Registrado": d.registrationDate,
+      "Registrado": d.registration_date,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ejemplares");
     XLSX.writeFile(wb, `abci-ejemplares-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    logAdminAction("Exportación de ejemplares", undefined, `${list.length} ejemplares`);
+    await logAdminAction(supabase, "Exportación de ejemplares", undefined, `${list.length} ejemplares`);
   }
 
-  const allVisibleSelected = visible.length > 0 && visible.every(d => selected.has(d.id));
+  const allVisibleSelected = dogs.length > 0 && dogs.every(d => selected.has(d.id));
 
   return (
     <AdminLayout>
@@ -113,7 +146,7 @@ export default function AdminDogsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight inline-flex items-center gap-2">
             <DogIcon className="w-7 h-7 text-amber-500" /> Ejemplares
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{dogs.length} ejemplares totales · {filtered.length} en vista actual</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString("es-PE")} ejemplares totales · {filteredCount.toLocaleString("es-PE")} en vista actual</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportSelected}>
@@ -172,7 +205,7 @@ export default function AdminDogsPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map(d => (
+              {dogs.map(d => (
                 <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition">
                   <td className="px-4 py-3">
                     <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)} className="w-4 h-4 rounded accent-amber-500" />
@@ -181,21 +214,21 @@ export default function AdminDogsPage() {
                     <Link href={`/ejemplar/${d.id}`} className="font-medium hover:text-amber-500">{d.name}</Link>
                     <div className="flex flex-wrap gap-1 mt-1">
                       <Badge>{d.gender === "male" ? "♂" : "♀"}</Badge>
-                      <Badge>Nro. {d.certificateId}</Badge>
+                      <Badge>Nro. {d.certificate_id}</Badge>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs hidden md:table-cell">
                     <p>{d.breed}</p>
                     <p className="text-muted-foreground">{d.variant} · {d.color}</p>
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{d.kennelName || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell">{formatShortDate(d.registrationDate)}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{d.kennel_name || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell">{formatShortDate(d.registration_date)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
                       <Link href={`/ejemplar/${d.id}`} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Ver">
                         <Eye className="w-4 h-4" />
                       </Link>
-                      <Link href={`/certificado/${d.certificateId}`} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Certificado">
+                      <Link href={`/certificado/${d.certificate_id}`} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted" title="Certificado">
                         <FileText className="w-4 h-4" />
                       </Link>
                       <button onClick={() => handleDelete(d.id, d.name)} className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-rose-500/10 text-rose-500" title="Eliminar">
@@ -205,7 +238,7 @@ export default function AdminDogsPage() {
                   </td>
                 </tr>
               ))}
-              {visible.length === 0 && (
+              {dogs.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
                     Sin resultados. Prueba con otros filtros.
@@ -216,7 +249,7 @@ export default function AdminDogsPage() {
           </table>
         </div>
 
-        {filtered.length > PAGE_SIZE && (
+        {filteredCount > PAGE_SIZE && (
           <div className="flex items-center justify-between p-4 border-t border-border">
             <p className="text-xs text-muted-foreground">Página {page} de {totalPages}</p>
             <div className="flex gap-2">

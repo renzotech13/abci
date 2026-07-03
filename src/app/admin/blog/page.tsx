@@ -3,29 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getStoredBlogPosts, adminSaveBlogPost, adminDeleteBlogPost, logAdminAction } from "@/lib/store";
-import { BLOG_POSTS } from "@/lib/blog";
-import type { BlogPost } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Input, Label, Textarea } from "@/components/ui";
-import { formatShortDate, slugify, generateId } from "@/lib/utils";
+import { formatShortDate, slugify } from "@/lib/utils";
 import {
   Newspaper, Plus, Trash2, Edit3, X, Save, Eye, FileText,
 } from "lucide-react";
+
+type BlogPost = Tables<"blog_posts">;
 
 const COVERS = ["📜", "🏷️", "🧬", "🎨", "🔁", "🏆"];
 
 function emptyPost(): BlogPost {
   return {
-    id: generateId("BP-"),
-    slug: "",
-    title: "",
-    excerpt: "",
-    body: "",
-    author: "",
-    date: new Date().toISOString().slice(0, 10),
-    tags: [],
-    cover: "📜",
-    readTime: 5,
+    id: "", slug: "", title: "", excerpt: "", body: "", author: "",
+    date: new Date().toISOString().slice(0, 10), tags: [], cover: "📜", read_time: 5,
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -35,18 +30,16 @@ export default function AdminBlogPage() {
   const [isNew, setIsNew] = useState(false);
   const [tagsRaw, setTagsRaw] = useState("");
 
-  useEffect(() => { refresh(); }, []);
-
-  function refresh() {
-    const stored = getStoredBlogPosts();
-    const seedMap = new Map(BLOG_POSTS.map(p => [p.slug, p]));
-    for (const s of stored) seedMap.set(s.slug, s);
-    setPosts(Array.from(seedMap.values()).sort((a, b) => b.date.localeCompare(a.date)));
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.from("blog_posts").select("*").order("date", { ascending: false });
+    setPosts(data ?? []);
   }
 
+  useEffect(() => { refresh(); }, []);
+
   function openNew() {
-    const p = emptyPost();
-    setEditing(p);
+    setEditing(emptyPost());
     setTagsRaw("");
     setIsNew(true);
   }
@@ -57,25 +50,37 @@ export default function AdminBlogPage() {
     setIsNew(false);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!editing) return;
     if (!editing.title) { alert("El título es obligatorio."); return; }
-    const post: BlogPost = {
-      ...editing,
+    const supabase = createClient();
+    const payload = {
       slug: editing.slug || slugify(editing.title),
+      title: editing.title,
+      excerpt: editing.excerpt,
+      body: editing.body,
+      author: editing.author,
+      date: editing.date,
       tags: tagsRaw.split(",").map(t => t.trim()).filter(Boolean),
+      cover: editing.cover,
+      read_time: editing.read_time,
     };
-    adminSaveBlogPost(post);
-    logAdminAction(isNew ? "Artículo publicado" : "Artículo actualizado", post.title);
+    if (isNew) {
+      await supabase.from("blog_posts").insert(payload);
+    } else {
+      await supabase.from("blog_posts").update(payload).eq("id", editing.id);
+    }
+    await logAdminAction(supabase, isNew ? "Artículo publicado" : "Artículo actualizado", payload.title);
     setEditing(null);
     setIsNew(false);
     refresh();
   }
 
-  function handleDelete(p: BlogPost) {
+  async function handleDelete(p: BlogPost) {
     if (!confirm(`¿Eliminar el artículo "${p.title}"?`)) return;
-    adminDeleteBlogPost(p.id);
-    logAdminAction("Artículo eliminado", p.title);
+    const supabase = createClient();
+    await supabase.from("blog_posts").delete().eq("id", p.id);
+    await logAdminAction(supabase, "Artículo eliminado", p.title);
     refresh();
   }
 
@@ -170,7 +175,7 @@ export default function AdminBlogPage() {
                   </div>
                   <div>
                     <Label>Tiempo de lectura (min)</Label>
-                    <Input type="number" value={editing.readTime} onChange={e => setEditing({ ...editing, readTime: Number(e.target.value) })} />
+                    <Input type="number" value={editing.read_time} onChange={e => setEditing({ ...editing, read_time: Number(e.target.value) })} />
                   </div>
                   <div>
                     <Label>Portada</Label>
@@ -189,7 +194,7 @@ export default function AdminBlogPage() {
                 </div>
                 <div>
                   <Label>Extracto</Label>
-                  <Textarea rows={2} value={editing.excerpt} onChange={e => setEditing({ ...editing, excerpt: e.target.value })} />
+                  <Textarea rows={2} value={editing.excerpt ?? ""} onChange={e => setEditing({ ...editing, excerpt: e.target.value })} />
                 </div>
                 <div>
                   <Label>Contenido del artículo (Markdown ligero)</Label>

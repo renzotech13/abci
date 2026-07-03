@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getAffixes, adminDeleteAffix, adminSaveAffix, logAdminAction } from "@/lib/store";
-import type { Affix } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Input, Select } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
 import {
   Tag, Search, Trash2, ShieldCheck, Eye, Edit3, X, Save,
 } from "lucide-react";
+
+type Affix = Tables<"affixes">;
 
 export default function AdminAffixesPage() {
   const [affixes, setAffixes] = useState<Affix[]>([]);
@@ -17,28 +20,38 @@ export default function AdminAffixesPage() {
   const [country, setCountry] = useState("all");
   const [editing, setEditing] = useState<Affix | null>(null);
 
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.from("affixes").select("*").order("name");
+    setAffixes(data ?? []);
+  }
+
   useEffect(() => { refresh(); }, []);
-  function refresh() { setAffixes(getAffixes()); }
 
   const countries = Array.from(new Set(affixes.map(a => a.country).filter(Boolean)));
 
   const filtered = affixes.filter(a => {
     if (country !== "all" && a.country !== country) return false;
-    if (query && !`${a.name} ${a.ownerName} ${a.specialty}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !`${a.name} ${a.owner_name} ${a.specialty}`.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
-  function handleDelete(a: Affix) {
+  async function handleDelete(a: Affix) {
     if (!confirm(`¿Eliminar el afijo ${a.name}? Esta acción no se puede deshacer.`)) return;
-    adminDeleteAffix(a.id);
-    logAdminAction("Afijo eliminado", a.name);
+    const supabase = createClient();
+    await supabase.from("affixes").delete().eq("id", a.id);
+    await logAdminAction(supabase, "Afijo eliminado", a.name);
     refresh();
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editing) return;
-    adminSaveAffix(editing);
-    logAdminAction("Afijo actualizado", editing.name);
+    const supabase = createClient();
+    const patch: TablesUpdate<"affixes"> = {
+      name: editing.name, specialty: editing.specialty, description: editing.description,
+    };
+    await supabase.from("affixes").update(patch).eq("id", editing.id);
+    await logAdminAction(supabase, "Afijo actualizado", editing.name);
     setEditing(null);
     refresh();
   }
@@ -75,10 +88,10 @@ export default function AdminAffixesPage() {
               <Badge variant="success"><ShieldCheck className="w-3 h-3" /> Activo</Badge>
             </div>
             <h3 className="font-mono font-bold text-lg mt-4">{a.name}</h3>
-            <p className="text-xs text-muted-foreground font-mono">{a.affixId}</p>
+            <p className="text-xs text-muted-foreground font-mono">{a.affix_code}</p>
             {a.specialty && <p className="text-sm text-muted-foreground mt-3 line-clamp-2">{a.specialty}</p>}
             <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-              <span>{a.ownerName}</span>
+              <span>{a.owner_name}</span>
               <span>{a.country}</span>
             </div>
             <div className="mt-4 flex gap-1">
@@ -92,7 +105,7 @@ export default function AdminAffixesPage() {
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-3">Registrado {formatShortDate(a.createdAt)}</p>
+            <p className="text-[10px] text-muted-foreground mt-3">Registrado {formatShortDate(a.created_at)}</p>
           </Card>
         ))}
       </div>

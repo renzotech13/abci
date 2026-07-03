@@ -2,33 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getEvents, adminSaveEvent, adminDeleteEvent, logAdminAction } from "@/lib/store";
-import type { Event } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Badge, Button, Input, Label, Select, Textarea } from "@/components/ui";
-import { formatShortDate } from "@/lib/utils";
-import { generateId } from "@/lib/utils";
 import {
   CalendarDays, Plus, Trash2, Edit3, X, Save, Trophy,
   Users, Swords, Tent, MapPin,
 } from "lucide-react";
 
-const TYPE_META = {
+type Event = Tables<"events">;
+
+const TYPE_META: Record<string, { label: string; Icon: typeof Trophy }> = {
   show: { label: "Exhibición", Icon: Trophy },
   meetup: { label: "Encuentro", Icon: Users },
   competition: { label: "Competencia", Icon: Swords },
   expo: { label: "Expo", Icon: Tent },
-} as const;
+};
 
 function emptyEvent(): Event {
   return {
-    id: generateId("E-"),
-    title: "",
-    date: "",
-    location: "",
-    city: "",
-    country: "",
-    type: "show",
-    description: "",
+    id: "", title: "", date: "", location: "", city: "", country: "",
+    type: "show", description: "", created_at: new Date().toISOString(),
   };
 }
 
@@ -37,26 +32,42 @@ export default function AdminEventsPage() {
   const [editing, setEditing] = useState<Event | null>(null);
   const [isNew, setIsNew] = useState(false);
 
-  useEffect(() => { refresh(); }, []);
-  function refresh() { setEvents(getEvents().sort((a, b) => a.date.localeCompare(b.date))); }
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.from("events").select("*").order("date");
+    setEvents(data ?? []);
+  }
 
-  function handleSave() {
+  useEffect(() => { refresh(); }, []);
+
+  async function handleSave() {
     if (!editing) return;
     if (!editing.title || !editing.date) {
       alert("El título y la fecha son obligatorios.");
       return;
     }
-    adminSaveEvent(editing);
-    logAdminAction(isNew ? "Evento creado" : "Evento actualizado", editing.title);
+    const supabase = createClient();
+    const payload = {
+      title: editing.title, date: editing.date, location: editing.location,
+      city: editing.city, country: editing.country, type: editing.type,
+      description: editing.description,
+    };
+    if (isNew) {
+      await supabase.from("events").insert(payload);
+    } else {
+      await supabase.from("events").update(payload).eq("id", editing.id);
+    }
+    await logAdminAction(supabase, isNew ? "Evento creado" : "Evento actualizado", editing.title);
     setEditing(null);
     setIsNew(false);
     refresh();
   }
 
-  function handleDelete(e: Event) {
+  async function handleDelete(e: Event) {
     if (!confirm(`¿Eliminar el evento "${e.title}"?`)) return;
-    adminDeleteEvent(e.id);
-    logAdminAction("Evento eliminado", e.title);
+    const supabase = createClient();
+    await supabase.from("events").delete().eq("id", e.id);
+    await logAdminAction(supabase, "Evento eliminado", e.title);
     refresh();
   }
 
@@ -79,7 +90,7 @@ export default function AdminEventsPage() {
 
       <div className="space-y-3">
         {events.map(e => {
-          const meta = TYPE_META[e.type];
+          const meta = TYPE_META[e.type] ?? TYPE_META.show;
           const d = new Date(e.date);
           return (
             <Card key={e.id} className="hover:border-amber-500/40 transition">
@@ -133,7 +144,7 @@ export default function AdminEventsPage() {
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <Label>Tipo</Label>
-                    <Select value={editing.type} onChange={e => setEditing({ ...editing, type: e.target.value as Event["type"] })}>
+                    <Select value={editing.type} onChange={e => setEditing({ ...editing, type: e.target.value })}>
                       <option value="show">Exhibición</option>
                       <option value="competition">Competencia</option>
                       <option value="expo">Expo</option>
@@ -147,21 +158,21 @@ export default function AdminEventsPage() {
                 </div>
                 <div>
                   <Label>Sede / Lugar</Label>
-                  <Input value={editing.location} onChange={e => setEditing({ ...editing, location: e.target.value })} placeholder="Ej: Centro de Convenciones Jockey Plaza" />
+                  <Input value={editing.location ?? ""} onChange={e => setEditing({ ...editing, location: e.target.value })} placeholder="Ej: Centro de Convenciones Jockey Plaza" />
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <Label>Ciudad</Label>
-                    <Input value={editing.city} onChange={e => setEditing({ ...editing, city: e.target.value })} />
+                    <Input value={editing.city ?? ""} onChange={e => setEditing({ ...editing, city: e.target.value })} />
                   </div>
                   <div>
                     <Label>País</Label>
-                    <Input value={editing.country} onChange={e => setEditing({ ...editing, country: e.target.value })} />
+                    <Input value={editing.country ?? ""} onChange={e => setEditing({ ...editing, country: e.target.value })} />
                   </div>
                 </div>
                 <div>
                   <Label>Descripción</Label>
-                  <Textarea rows={3} value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+                  <Textarea rows={3} value={editing.description ?? ""} onChange={e => setEditing({ ...editing, description: e.target.value })} />
                 </div>
                 <div className="flex gap-2 pt-4 border-t border-border">
                   <Button variant="outline" onClick={() => setEditing(null)} className="flex-1">Cancelar</Button>

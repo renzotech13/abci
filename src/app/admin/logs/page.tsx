@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getAdminLogs } from "@/lib/store";
-import type { AdminLog } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Input } from "@/components/ui";
 import { ScrollText, Search, Activity } from "lucide-react";
+
+type AdminLog = Tables<"admin_logs">;
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -23,11 +25,15 @@ export default function AdminLogsPage() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [query, setQuery] = useState("");
 
-  useEffect(() => { setLogs(getAdminLogs()); }, []);
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("admin_logs").select("*").order("timestamp", { ascending: false }).limit(200)
+      .then(({ data }) => setLogs(data ?? []));
+  }, []);
 
   const filtered = logs.filter(l => {
     if (!query) return true;
-    return `${l.action} ${l.target} ${l.adminName} ${l.details}`.toLowerCase().includes(query.toLowerCase());
+    return `${l.action} ${l.target} ${l.admin_name} ${l.details}`.toLowerCase().includes(query.toLowerCase());
   });
 
   return (
@@ -62,7 +68,7 @@ export default function AdminLogsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{l.action}{l.target && <span className="text-muted-foreground"> · {l.target}</span>}</p>
                   {l.details && <p className="text-xs text-muted-foreground mt-0.5">{l.details}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">{l.adminName} · {formatRelative(l.timestamp)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{l.admin_name} · {formatRelative(l.timestamp)}</p>
                 </div>
               </li>
             ))}

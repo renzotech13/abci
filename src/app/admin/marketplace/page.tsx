@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { getMarketplace, adminDeleteListing, logAdminAction } from "@/lib/store";
-import type { MarketplaceListing } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Card, Badge, Input, Select } from "@/components/ui";
 import { currency, formatShortDate } from "@/lib/utils";
 import {
   ShoppingBag, Search, Trash2, Baby, Dog as DogIcon, Heart, Package, type LucideIcon,
 } from "lucide-react";
 
-const TYPE_ICON: Record<MarketplaceListing["type"], LucideIcon> = {
+type Listing = Tables<"marketplace_listings">;
+
+const TYPE_ICON: Record<string, LucideIcon> = {
   puppy: Baby,
   adult: DogIcon,
   stud: Heart,
@@ -18,23 +21,29 @@ const TYPE_ICON: Record<MarketplaceListing["type"], LucideIcon> = {
 };
 
 export default function AdminMarketplacePage() {
-  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [query, setQuery] = useState("");
-  const [type, setType] = useState<"all" | "puppy" | "adult" | "stud" | "equipment">("all");
+  const [type, setType] = useState("all");
+
+  async function refresh() {
+    const supabase = createClient();
+    const { data } = await supabase.from("marketplace_listings").select("*").order("posted", { ascending: false });
+    setListings(data ?? []);
+  }
 
   useEffect(() => { refresh(); }, []);
-  function refresh() { setListings(getMarketplace()); }
 
-  function handleDelete(l: MarketplaceListing) {
+  async function handleDelete(l: Listing) {
     if (!confirm(`¿Eliminar el anuncio "${l.title}"?`)) return;
-    adminDeleteListing(l.id);
-    logAdminAction("Anuncio eliminado", l.title, l.sellerName);
+    const supabase = createClient();
+    await supabase.from("marketplace_listings").delete().eq("id", l.id);
+    await logAdminAction(supabase, "Anuncio eliminado", l.title, l.seller_name);
     refresh();
   }
 
   const filtered = listings.filter(l => {
     if (type !== "all" && l.type !== type) return false;
-    if (query && !`${l.title} ${l.description} ${l.sellerName}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !`${l.title} ${l.description} ${l.seller_name}`.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
@@ -53,7 +62,7 @@ export default function AdminMarketplacePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar título, descripción, vendedor..." className="pl-9" />
           </div>
-          <Select value={type} onChange={e => setType(e.target.value as "all" | "puppy" | "adult" | "stud" | "equipment")}>
+          <Select value={type} onChange={e => setType(e.target.value)}>
             <option value="all">Todos los tipos</option>
             <option value="puppy">Cachorros</option>
             <option value="adult">Adultos</option>
@@ -65,7 +74,7 @@ export default function AdminMarketplacePage() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(l => {
-          const Icon = TYPE_ICON[l.type];
+          const Icon = TYPE_ICON[l.type] || ShoppingBag;
           return (
             <Card key={l.id} className="hover:border-amber-500/40 transition">
               <div className="aspect-[4/3] rounded-xl bg-gradient-to-br from-amber-500/15 to-zinc-900/30 flex items-center justify-center mb-3">
@@ -80,7 +89,7 @@ export default function AdminMarketplacePage() {
                   <p className="text-[10px] text-muted-foreground">{l.location}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-medium">{l.sellerName}</p>
+                  <p className="text-xs font-medium">{l.seller_name}</p>
                   <p className="text-[10px] text-muted-foreground">{formatShortDate(l.posted)}</p>
                 </div>
               </div>

@@ -3,35 +3,36 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn, seedData, getCurrentUser } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Card } from "@/components/ui";
-import { ShieldCheck, Ticket, ArrowLeft } from "lucide-react";
+import { ShieldCheck, ArrowLeft } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    seedData();
-    const user = signIn(email, password);
-    if (!user) {
+    setBusy(true);
+    const supabase = createClient();
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError || !data.user) {
+      setBusy(false);
       setError("Credenciales inválidas.");
       return;
     }
-    if (user.role !== "admin") {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+    if (profile?.role !== "admin") {
+      await supabase.auth.signOut();
+      setBusy(false);
       setError("Esta cuenta no tiene permisos de administrador.");
       return;
     }
     router.push("/admin");
-  }
-
-  function loginDemo() {
-    seedData();
-    const u = signIn("admin@abciregistro.app", "admin1234");
-    if (u && u.role === "admin") router.push("/admin");
+    router.refresh();
   }
 
   return (
@@ -60,23 +61,8 @@ export default function AdminLoginPage() {
               <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-900 border-zinc-800 text-white" />
             </div>
             {error && <p className="text-sm text-rose-400">{error}</p>}
-            <Button type="submit" variant="accent" size="lg" className="w-full">Ingresar al panel</Button>
+            <Button type="submit" variant="accent" size="lg" className="w-full" disabled={busy}>Ingresar al panel</Button>
           </form>
-
-          <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
-            <div className="flex-1 border-t border-zinc-800" />
-            <span>o</span>
-            <div className="flex-1 border-t border-zinc-800" />
-          </div>
-
-          <Button onClick={loginDemo} variant="outline" size="lg" className="w-full border-zinc-700 text-white hover:bg-zinc-900">
-            <Ticket className="w-4 h-4" /> Cuenta admin demo
-          </Button>
-
-          <div className="mt-5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-zinc-300">
-            <p className="font-semibold text-amber-400 mb-1">Credenciales demo:</p>
-            <p className="font-mono">admin@abciregistro.app / admin1234</p>
-          </div>
         </Card>
 
         <p className="mt-6 text-center text-xs text-zinc-500">

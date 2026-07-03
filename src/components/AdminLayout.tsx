@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, ReactNode } from "react";
-import { getCurrentUser, isAdmin, seedData, signOut } from "@/lib/store";
-import type { User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Badge } from "./ui";
 import {
   LayoutDashboard, Dog as DogIcon, Users, FileText, Tag,
@@ -60,31 +60,41 @@ const groups = [
   },
 ];
 
+type Profile = Tables<"profiles">;
+
 export function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    seedData();
-    const u = getCurrentUser();
-    if (!u) {
-      router.push("/admin/login");
-      return;
+    let cancelled = false;
+    async function check() {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push("/admin/login");
+        return;
+      }
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
+      if (cancelled) return;
+      if (!profile || profile.role !== "admin") {
+        router.push("/panel");
+        return;
+      }
+      setUser(profile);
+      setLoading(false);
     }
-    if (!isAdmin()) {
-      router.push("/panel");
-      return;
-    }
-    setUser(u);
-    setLoading(false);
+    check();
+    return () => { cancelled = true; };
   }, [router, pathname]);
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     router.push("/admin/login");
   }
 

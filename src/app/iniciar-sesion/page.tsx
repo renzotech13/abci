@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn, seedData } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Card } from "@/components/ui";
 import { Ticket } from "lucide-react";
 
@@ -12,22 +12,28 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    seedData();
-    const user = signIn(email, password);
-    if (!user) {
+  async function doSignIn(email: string, password: string) {
+    setBusy(true);
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (signInError) {
       setError("Correo o contraseña incorrectos. Prueba con la cuenta demo más abajo.");
       return;
     }
     router.push("/panel");
+    router.refresh();
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    doSignIn(email, password);
   }
 
   function loginDemo() {
-    seedData();
-    const u = signIn("demo@abciregistro.app", "demo1234");
-    if (u) router.push("/panel");
+    doSignIn("demo@abciregistro.app", "demo1234");
   }
 
   return (
@@ -50,14 +56,14 @@ export default function LoginPage() {
             <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
           </div>
           {error && <p className="text-sm text-rose-500">{error}</p>}
-          <Button type="submit" variant="accent" size="lg" className="w-full">Iniciar sesión</Button>
+          <Button type="submit" variant="accent" size="lg" className="w-full" disabled={busy}>Iniciar sesión</Button>
         </form>
         <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex-1 border-t border-border" />
           <span>o</span>
           <div className="flex-1 border-t border-border" />
         </div>
-        <Button onClick={loginDemo} variant="outline" size="lg" className="w-full">
+        <Button onClick={loginDemo} variant="outline" size="lg" className="w-full" disabled={busy}>
           <Ticket className="w-4 h-4" /> Probar con cuenta demo
         </Button>
       </Card>

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, ReactNode } from "react";
-import { getCurrentUser, seedData } from "@/lib/store";
-import type { User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Badge } from "./ui";
 import {
   Home, Dog as DogIcon, PlusCircle, Users2, Tag,
@@ -23,21 +23,30 @@ const items = [
   { href: "/panel/profile", label: "Perfil y criadero", Icon: Settings },
 ];
 
+type Profile = Tables<"profiles">;
+
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    seedData();
-    const u = getCurrentUser();
-    if (!u) {
-      router.push("/iniciar-sesion");
-      return;
+    let cancelled = false;
+    async function check() {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push("/iniciar-sesion");
+        return;
+      }
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
+      if (cancelled) return;
+      setUser(profile);
+      setLoading(false);
     }
-    setUser(u);
-    setLoading(false);
+    check();
+    return () => { cancelled = true; };
   }, [router, pathname]);
 
   if (loading || !user) {
@@ -59,7 +68,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="min-w-0">
                 <p className="font-semibold truncate">{user.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{user.kennelName || user.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.kennel_name || user.email}</p>
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs">

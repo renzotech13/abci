@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
-import { getCurrentUser, signOut, seedData } from "@/lib/store";
-import type { User } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/supabase/database.types";
 import { usePathname, useRouter } from "next/navigation";
 import { QrCode, Menu, X, LayoutDashboard, ShieldCheck } from "lucide-react";
 
@@ -19,24 +19,43 @@ const nav = [
   { href: "/membresia", label: "Membresía" },
 ];
 
+type Profile = Tables<"profiles">;
+
 export function Navbar() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    seedData();
-    setUser(getCurrentUser());
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function loadProfile(authUserId: string | undefined) {
+      if (!authUserId) { if (!cancelled) setUser(null); return; }
+      const { data } = await supabase.from("profiles").select("*").eq("id", authUserId).maybeSingle();
+      if (!cancelled) setUser(data);
+    }
+
+    supabase.auth.getUser().then(({ data }) => loadProfile(data.user?.id));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadProfile(session?.user?.id);
+    });
+
     const handler = () => setScrolled(window.scrollY > 8);
     window.addEventListener("scroll", handler);
     handler();
-    return () => window.removeEventListener("scroll", handler);
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+      window.removeEventListener("scroll", handler);
+    };
   }, [pathname]);
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     setUser(null);
     router.push("/");
   }

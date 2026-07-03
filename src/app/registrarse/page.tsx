@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signUp, seedData } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Card } from "@/components/ui";
 
 export default function RegisterPage() {
@@ -12,20 +12,30 @@ export default function RegisterPage() {
     name: "", email: "", password: "", kennelName: "", country: "",
   });
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    seedData();
     if (form.password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
-    const user = signUp(form);
-    if (!user) {
-      setError("Ya existe una cuenta con este correo electrónico.");
+    setBusy(true);
+    const supabase = createClient();
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: { data: { name: form.name, kennel_name: form.kennelName || null, country: form.country || null } },
+    });
+    setBusy(false);
+    if (signUpError) {
+      setError(signUpError.message.includes("already registered")
+        ? "Ya existe una cuenta con este correo electrónico."
+        : signUpError.message);
       return;
     }
     router.push("/panel");
+    router.refresh();
   }
 
   return (
@@ -57,7 +67,7 @@ export default function RegisterPage() {
             <Input id="country" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} placeholder="Perú" />
           </div>
           {error && <p className="text-sm text-rose-500">{error}</p>}
-          <Button type="submit" variant="accent" size="lg" className="w-full">Crear cuenta gratuita</Button>
+          <Button type="submit" variant="accent" size="lg" className="w-full" disabled={busy}>{busy ? "Creando cuenta…" : "Crear cuenta gratuita"}</Button>
           <p className="text-xs text-muted-foreground text-center">
             Al registrarte aceptas nuestros <Link href="/terminos" className="underline">Términos</Link> y nuestro <Link href="/codigo-de-conducta" className="underline">Código de Conducta</Link>.
           </p>
